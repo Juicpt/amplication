@@ -1,14 +1,14 @@
-export { getApp } from './apps-get';
-export { getApps } from './apps-list';
-export { createApp } from './apps-create';
-export { updateApp } from './apps-update';
-export { commitChanges } from './apps-commit';
+export { getResource } from "./resources-get";
+export { getResources } from "./resources-list";
+export { createService } from "./resources-create";
+export { updateResource } from "./resources-update";
+export { commitChanges } from "./resources-commit";
 
-export { getEntities } from './entities-list';
-export { getEntity } from './entities-get';
-export { createEntity } from './entities-create';
-export { updateEntity } from './entities-update';
+export { getEntities } from "./entities-list";
+export { getEntity } from "./entities-get";
+export { createEntity } from "./entities-create";
+export { updateEntity } from "./entities-update";
 
-export { getFields } from './fields-list';
-export { createFieldByDisplayName } from './fields-create-by-display-name';
-export { updateField } from './fields-update';
+export { getFields } from "./fields-list";
+export { createFieldByDisplayName } from "./fields-create-by-display-name";
+export { updateField } from "./fields-update";

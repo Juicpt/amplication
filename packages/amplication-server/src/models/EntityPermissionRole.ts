@@ -1,44 +1,43 @@
-import { Field, ObjectType } from '@nestjs/graphql';
-import { EntityPermission } from './EntityPermission'; // eslint-disable-line import/no-cycle
-import { AppRole } from './AppRole'; // eslint-disable-line import/no-cycle
-import { EnumEntityAction } from 'src/enums/EnumEntityAction';
+import { Field, ObjectType } from "@nestjs/graphql";
+import { EntityPermission } from "./EntityPermission";
+import { ResourceRole } from "./ResourceRole";
+import { EnumEntityAction } from "../enums/EnumEntityAction";
 
 /**
- * Connecting {@codelink EntityPermission} to {@codelink AppRole}.
+ * Connecting {@codelink EntityPermission} to {@codelink ResourceRole}.
  * Defines an ID so fields EntityPermissionRole can link to it.
  */
 @ObjectType({
   isAbstract: true,
-  description: undefined
 })
 export class EntityPermissionRole {
   @Field(() => String, {
-    nullable: false
+    nullable: false,
   })
   id!: string;
 
   @Field(() => String, {
-    nullable: false
+    nullable: false,
   })
   entityVersionId!: string;
 
   @Field(() => EnumEntityAction, {
-    nullable: false
+    nullable: false,
   })
   action!: keyof typeof EnumEntityAction;
 
   @Field(() => EntityPermission, {
-    nullable: true
+    nullable: true,
   })
   entityPermission?: EntityPermission;
 
   @Field(() => String, {
-    nullable: false
+    nullable: false,
   })
-  appRoleId!: string;
+  resourceRoleId!: string;
 
-  @Field(() => AppRole, {
-    nullable: false
+  @Field(() => ResourceRole, {
+    nullable: false,
   })
-  appRole: AppRole;
+  resourceRole: ResourceRole;
 }

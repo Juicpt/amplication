@@ -1,6 +1,6 @@
-import { ArgsType, Field } from '@nestjs/graphql';
-import { EntityFieldUpdateInput } from './EntityFieldUpdateInput';
-import { WhereUniqueInput } from 'src/dto';
+import { ArgsType, Field } from "@nestjs/graphql";
+import { EntityFieldUpdateInput } from "./EntityFieldUpdateInput";
+import { WhereUniqueInput } from "../../../dto";
 
 @ArgsType()
 export class UpdateOneEntityFieldArgs {
@@ -15,4 +15,7 @@ export class UpdateOneEntityFieldArgs {
 
   @Field(() => String, { nullable: true })
   relatedFieldDisplayName?: string;
+
+  @Field(() => Boolean, { nullable: true })
+  relatedFieldAllowMultipleSelection?: boolean;
 }

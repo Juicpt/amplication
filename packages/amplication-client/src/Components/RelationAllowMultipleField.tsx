@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { useFormikContext } from "formik";
-import { RadioButtonField } from "@amplication/design-system";
+import { RadioButtonField } from "@amplication/ui/design-system";
 
 type Props = {
   fieldName: string;
@@ -8,11 +8,7 @@ type Props = {
   entityDisplayName: string;
 };
 
-const RelationAllowMultiple = ({
-  fieldName,
-  isDisabled,
-  entityDisplayName,
-}: Props) => {
+const RelationAllowMultiple = ({ fieldName, entityDisplayName }: Props) => {
   const formik = useFormikContext<{
     id: string;
     displayName: string;
@@ -34,15 +30,13 @@ const RelationAllowMultiple = ({
   return (
     <>
       <RadioButtonField
-        disabled={isDisabled}
         name="relationAllowMultiple-field"
         value="true"
-        checked={formik.values.properties.allowMultipleSelection}
+        checked={formik.values.properties.allowMultipleSelection == true}
         label={`One '${entityDisplayName}' can be related to many '${formik.values.displayName}'`}
         onChange={handleChange}
       />
       <RadioButtonField
-        disabled={isDisabled}
         name="relationAllowMultiple-field"
         value="false"
         checked={!formik.values.properties.allowMultipleSelection}

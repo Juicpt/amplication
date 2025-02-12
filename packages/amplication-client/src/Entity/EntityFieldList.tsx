@@ -1,33 +1,44 @@
-import React, { useState, useCallback, useMemo } from "react";
-import { gql, useQuery } from "@apollo/client";
-import { formatError } from "../util/error";
-import * as models from "../models";
 import {
+  CircularProgress,
+  EnumFlexItemMargin,
+  EnumTextColor,
+  EnumTextStyle,
+  FlexItem,
+  List,
   SearchField,
   Snackbar,
-  CircularProgress,
-} from "@amplication/design-system";
+  TabContentTitle,
+  Text,
+} from "@amplication/ui/design-system";
+import { gql, useQuery } from "@apollo/client";
+import React, { useCallback, useMemo, useState } from "react";
+import * as models from "../models";
+import { formatError } from "../util/error";
 
+import { pluralize } from "../util/pluralize";
 import { EntityFieldListItem } from "./EntityFieldListItem";
 import { GET_ENTITIES } from "./EntityList";
-import "./EntityFieldList.scss";
 
 type TData = {
   entity: models.Entity;
 };
 
 const DATE_CREATED_FIELD = "createdAt";
-const CLASS_NAME = "entity-field-list";
 
 type Props = {
   entityId: string;
+  entityName: string;
 };
 
-export const EntityFieldList = React.memo(({ entityId }: Props) => {
+const EntityFieldList = React.memo(({ entityId, entityName }: Props) => {
   const [searchPhrase, setSearchPhrase] = useState<string>("");
   const [error, setError] = useState<Error>();
 
-  const { data, loading, error: errorLoading } = useQuery<TData>(GET_FIELDS, {
+  const {
+    data,
+    loading,
+    error: errorLoading,
+  } = useQuery<TData>(GET_FIELDS, {
     variables: {
       id: entityId,
       orderBy: {
@@ -44,7 +55,7 @@ export const EntityFieldList = React.memo(({ entityId }: Props) => {
     entities: models.Entity[];
   }>(GET_ENTITIES, {
     variables: {
-      id: data?.entity.appId,
+      id: data?.entity.resourceId,
       orderBy: undefined,
       whereName: undefined,
     },
@@ -70,33 +81,39 @@ export const EntityFieldList = React.memo(({ entityId }: Props) => {
 
   return (
     <>
-      <div className={`${CLASS_NAME}__header`}>
-        <SearchField
-          label="search"
-          placeholder="search"
-          onChange={handleSearchChange}
-        />
-      </div>
-      <div className={`${CLASS_NAME}__title`}>
-        {data?.entity.fields?.length} Fields
-      </div>
-      {loading && <CircularProgress />}
-      {data?.entity.fields?.map((field) => (
-        <EntityFieldListItem
-          key={field.id}
-          applicationId={data?.entity.appId}
-          entity={data?.entity}
-          entityField={field}
-          entityIdToName={entityIdToName}
-          onError={setError}
-        />
-      ))}
+      <Text textColor={EnumTextColor.Primary}>{`${entityName} entity`}</Text>
+      <TabContentTitle title="Entity Fields" subTitle="" />
+      <SearchField
+        label="search"
+        placeholder="Search"
+        onChange={handleSearchChange}
+      />
+      <FlexItem margin={EnumFlexItemMargin.Both}>
+        <Text textStyle={EnumTextStyle.Tag}>
+          {data?.entity.fields?.length}{" "}
+          {pluralize(data?.entity.fields?.length, "Field", "Fields")}
+        </Text>
+      </FlexItem>
+      {loading && <CircularProgress centerToParent />}
+      <List>
+        {data?.entity.fields?.map((field) => (
+          <EntityFieldListItem
+            key={field.id}
+            resourceId={data?.entity.resourceId}
+            entity={data?.entity}
+            entityField={field}
+            entityIdToName={entityIdToName}
+            onError={setError}
+          />
+        ))}
+      </List>
       <Snackbar open={Boolean(error || errorLoading)} message={errorMessage} />
     </>
   );
 });
 
-/**@todo: expand search on other field  */
+export default EntityFieldList;
+
 export const GET_FIELDS = gql`
   query getEntityFields(
     $id: String!
@@ -105,7 +122,7 @@ export const GET_FIELDS = gql`
   ) {
     entity(where: { id: $id }) {
       id
-      appId
+      resourceId
       fields(where: { displayName: $whereName }, orderBy: $orderBy) {
         id
         displayName
@@ -114,6 +131,7 @@ export const GET_FIELDS = gql`
         required
         unique
         searchable
+        customAttributes
         description
         properties
       }

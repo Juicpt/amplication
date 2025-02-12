@@ -4,7 +4,8 @@
   &__add-field {
     @include flexFullRow;
     justify-content: flex-start;
-    color: var(--black90);
+    color: var(--gray-10);
+    font-size: 14px;
   }
 
   &__field {
@@ -16,10 +17,13 @@
 
   &__header {
     @include flexFullRow;
-    color: var(--black80);
+    color: var(--gray-20);
     // margin-bottom: var(--default-spacing);
   }
   &__action-name {
-    color: var(--black100);
+    color: var(--gray-base);
+  }
+  .select-menu__summary {
+    margin: 12px;
   }
 }

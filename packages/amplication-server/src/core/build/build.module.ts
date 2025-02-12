@@ -1,24 +1,32 @@
-import { forwardRef, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ExceptionFiltersModule } from 'src/filters/exceptionFilters.module';
-import { PrismaModule } from 'nestjs-prisma';
-import { GqlAuthModule } from 'src/guards/gql-auth.module';
-import { EntityModule } from 'src/core/entity/entity.module';
-import { PermissionsModule } from 'src/core/permissions/permissions.module';
-import { UserModule } from 'src/core/user/user.module';
-import { AppRoleModule } from 'src/core/appRole/appRole.module';
-import { AppModule } from 'src/core/app/app.module'; // eslint-disable-line import/no-cycle
-import { AppSettingsModule } from 'src/core/appSettings/appSettings.module'; // eslint-disable-line import/no-cycle
-import { BuildService } from './build.service';
-import { BuildResolver } from './build.resolver';
-import { BuildController } from './build.controller';
-import { RootStorageModule } from '../storage/root-storage.module';
-import { ActionModule } from '../action/action.module';
-import { DeploymentModule } from '../deployment/deployment.module';
-import { ContainerBuilderRootModule } from '../containerBuilder/containerBuilderRoot.module';
-import { StorageOptionsModule } from '../storage/storage-options.module';
-import { GitModule } from '@amplication/git-service';
-// eslint-disable-next-line import/no-cycle
+import { forwardRef, Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { ExceptionFiltersModule } from "../../filters/exceptionFilters.module";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { GqlAuthModule } from "../../guards/gql-auth.module";
+import { EntityModule } from "../entity/entity.module";
+import { PermissionsModule } from "../permissions/permissions.module";
+import { UserModule } from "../user/user.module";
+import { ResourceRoleModule } from "../resourceRole/resourceRole.module";
+import { ResourceModule } from "../resource/resource.module";
+import { ServiceSettingsModule } from "../serviceSettings/serviceSettings.module";
+import { BuildService } from "./build.service";
+import { BuildResolver } from "./build.resolver";
+import { BuildController } from "./build.controller";
+import { ActionModule } from "../action/action.module";
+import { CommitModule } from "../commit/commit.module";
+import { TopicModule } from "../topic/topic.module";
+import { ServiceTopicsModule } from "../serviceTopics/serviceTopics.module";
+import { PluginInstallationModule } from "../pluginInstallation/pluginInstallation.module";
+import { BillingModule } from "../billing/billing.module";
+import { KafkaModule } from "@amplication/util/nestjs/kafka";
+import { GitProviderModule } from "../git/git.provider.module";
+import { ModuleModule } from "../module/module.module";
+import { ModuleActionModule } from "../moduleAction/moduleAction.module";
+import { ModuleDtoModule } from "../moduleDto/moduleDto.module";
+import { PackageModule } from "../package/package.module";
+import { ProjectConfigurationSettingsModule } from "../projectConfigurationSettings/projectConfigurationSettings.module";
+import { PrivatePluginModule } from "../privatePlugin/privatePlugin.module";
+import { ResourceSettingsModule } from "../resourceSettings/resourceSettings.module";
 
 @Module({
   imports: [
@@ -29,18 +37,27 @@ import { GitModule } from '@amplication/git-service';
     PrismaModule,
     PermissionsModule,
     UserModule,
-    RootStorageModule,
-    AppRoleModule,
+    ResourceRoleModule,
     ActionModule,
-    ContainerBuilderRootModule,
-    StorageOptionsModule,
-    DeploymentModule,
-    GitModule,
-    forwardRef(() => AppModule),
-    AppSettingsModule
+    forwardRef(() => ResourceModule),
+    ServiceSettingsModule,
+    KafkaModule,
+    PluginInstallationModule,
+    forwardRef(() => CommitModule),
+    TopicModule,
+    ServiceTopicsModule,
+    BillingModule,
+    GitProviderModule,
+    ModuleModule,
+    ModuleActionModule,
+    ModuleDtoModule,
+    PackageModule,
+    ProjectConfigurationSettingsModule,
+    PrivatePluginModule,
+    ResourceSettingsModule,
   ],
   providers: [BuildService, BuildResolver],
   exports: [BuildService, BuildResolver],
-  controllers: [BuildController]
+  controllers: [BuildController],
 })
 export class BuildModule {}

@@ -1,0 +1,22 @@
+@import "../style/index.scss";
+
+$logo-size: 44px;
+
+.plugin-logo {
+  width: $logo-size;
+  height: $logo-size;
+  background-color: var(--gray-full);
+  border-radius: var(--default-border-radius);
+  border: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  img {
+    max-height: 100%;
+    max-width: 100%;
+  }
+  .amp-icon {
+    color: var(--gray-base);
+  }
+}

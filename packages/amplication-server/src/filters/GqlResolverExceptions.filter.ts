@@ -3,17 +3,20 @@
 // @UseFilters(GqlResolverExceptionsFilter)
 // export class AuthResolver {
 // It logs the exception with context information like IP, Host, UserId
-// It uses Winston directly to log the error
+// It uses nest logger module to log
 
-import { Catch, ArgumentsHost, Inject, HttpException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { GqlExceptionFilter, GqlArgumentsHost } from '@nestjs/graphql';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { Logger } from 'winston';
-import { Prisma } from '@prisma/client';
-import { ApolloError } from 'apollo-server-express';
-import { Request } from 'express';
-import { AmplicationError } from '../errors/AmplicationError';
+import { Catch, ArgumentsHost, Inject, HttpException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { GqlExceptionFilter, GqlArgumentsHost } from "@nestjs/graphql";
+import { Prisma } from "../prisma";
+import { ApolloError } from "apollo-server-express";
+import { Request } from "express";
+import { AmplicationError } from "../errors/AmplicationError";
+import { BillingLimitationError } from "../errors/BillingLimitationError";
+import { AmplicationLogger } from "@amplication/util/nestjs/logging";
+import { GraphQLUniqueKeyException } from "../errors/graphql/graphql-unique-key-error";
+import { GraphQLInternalServerError } from "../errors/graphql/graphql-internal-server-error";
+import { GraphQLBillingError } from "../errors/graphql/graphql-billing-limitation-error";
 
 export type RequestData = {
   query: string;
@@ -22,36 +25,27 @@ export type RequestData = {
   userId: string;
 };
 
-export const PRISMA_CODE_UNIQUE_KEY_VIOLATION = 'P2002';
-
-export class UniqueKeyException extends ApolloError {
-  constructor(fields: string[]) {
-    super(
-      `Another record with the same key already exist (${fields.join(', ')})`
-    );
-  }
+interface RequestWithUser extends Request {
+  user: { id: string } | null;
 }
 
-export class InternalServerError extends ApolloError {
-  constructor() {
-    super('Internal server error');
-  }
-}
+export const PRISMA_CODE_UNIQUE_KEY_VIOLATION = "P2002";
 
-export function createRequestData(req: Request): RequestData {
-  const user = req.user as { id: string } | null;
+export function createRequestData(req: RequestWithUser): RequestData {
+  const user = req.user;
   return {
     query: req.body?.query,
     hostname: req.hostname,
     ip: req.ip,
-    userId: user?.id
+    userId: user?.id,
   };
 }
 
 @Catch()
 export class GqlResolverExceptionsFilter implements GqlExceptionFilter {
   constructor(
-    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+    @Inject(AmplicationLogger)
+    private readonly logger: AmplicationLogger,
     private readonly configService: ConfigService
   ) {}
 
@@ -63,10 +57,17 @@ export class GqlResolverExceptionsFilter implements GqlExceptionFilter {
       exception instanceof Prisma.PrismaClientKnownRequestError &&
       exception.code === PRISMA_CODE_UNIQUE_KEY_VIOLATION
     ) {
-      // Convert PrismaClientKnownRequestError to UniqueKeyException and pass the error to the client
+      // Convert PrismaClientKnownRequestError to GraphQLUniqueKeyException and pass the error to the client
       const fields = (exception.meta as { target: string[] }).target;
-      clientError = new UniqueKeyException(fields);
+      clientError = new GraphQLUniqueKeyException(fields);
       this.logger.info(clientError.message, { requestData });
+    } else if (exception instanceof BillingLimitationError) {
+      clientError = new GraphQLBillingError(
+        exception.message,
+        exception.billingFeature,
+        exception.bypassAllowed
+      );
+      this.logger.info(clientError.message, { exception });
     } else if (exception instanceof AmplicationError) {
       // Convert AmplicationError to ApolloError and pass the error to the client
       clientError = new ApolloError(exception.message);
@@ -80,10 +81,10 @@ export class GqlResolverExceptionsFilter implements GqlExceptionFilter {
       // eslint-disable-next-line
       // @ts-ignore
       exception.requestData = requestData;
-      this.logger.error(exception);
+      this.logger.error(exception.message, exception);
       clientError =
-        this.configService.get('NODE_ENV') === 'production'
-          ? new InternalServerError()
+        this.configService.get("NODE_ENV") === "production"
+          ? new GraphQLInternalServerError()
           : new ApolloError(exception.message);
     }
 

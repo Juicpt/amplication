@@ -1,52 +1,56 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { gql } from 'apollo-server-express';
+import { Test, TestingModule } from "@nestjs/testing";
 import {
-  ApolloServerTestClient,
-  createTestClient
-} from 'apollo-server-testing';
-import { GqlAuthGuard } from 'src/guards/gql-auth.guard';
-import { INestApplication } from '@nestjs/common';
-import { GraphQLModule } from '@nestjs/graphql';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { ConfigService } from '@nestjs/config';
-import { CommitService } from './commit.service';
-import { Commit, User } from 'src/models';
-import { UserService } from '../user/user.service';
-import { BuildService } from '../build/build.service';
+  ApolloDriver,
+  ApolloDriverConfig,
+  getApolloServer,
+} from "@nestjs/apollo";
+import { gql } from "apollo-server-express";
+import { GqlAuthGuard } from "../../guards/gql-auth.guard";
+import { INestApplication } from "@nestjs/common";
+import { GraphQLModule } from "@nestjs/graphql";
+import { ConfigService } from "@nestjs/config";
+import { CommitService } from "./commit.service";
+import { Commit, User } from "../../models";
+import { UserService } from "../user/user.service";
+import { BuildService } from "../build/build.service";
+import { CommitResolver } from "./commit.resolver";
+import { AmplicationLogger } from "@amplication/util/nestjs/logging";
+import { ApolloServerBase } from "apollo-server-core";
+import { EnumResourceTypeGroup } from "../resource/dto/EnumResourceTypeGroup";
 
-import { CommitResolver } from './commit.resolver';
-
-const EXAMPLE_COMMIT_ID = 'exampleCommitId';
-const EXAMPLE_USER_ID = 'exampleUserId';
-const EXAMPLE_MESSAGE = 'exampleMessage';
+const EXAMPLE_COMMIT_ID = "exampleCommitId";
+const EXAMPLE_USER_ID = "exampleUserId";
+const EXAMPLE_MESSAGE = "exampleMessage";
 
 const EXAMPLE_COMMIT: Commit = {
   id: EXAMPLE_COMMIT_ID,
   userId: EXAMPLE_USER_ID,
   message: EXAMPLE_MESSAGE,
-  createdAt: new Date()
+  createdAt: new Date(),
 };
 
 const EXAMPLE_USER: User = {
   id: EXAMPLE_USER_ID,
   createdAt: new Date(),
-  updatedAt: new Date()
+  updatedAt: new Date(),
+  isOwner: true,
 };
 
 const USER_QUERY = gql`
-  query($id: String!) {
+  query ($id: String!) {
     commit(where: { id: $id }) {
       user {
         id
         createdAt
         updatedAt
+        isOwner
       }
     }
   }
 `;
 
 const FIND_ONE_COMMIT_QUERY = gql`
-  query($id: String!) {
+  query ($id: String!) {
     commit(where: { id: $id }) {
       id
       userId
@@ -57,8 +61,10 @@ const FIND_ONE_COMMIT_QUERY = gql`
 `;
 
 const FIND_MANY_COMMIT_QUERY = gql`
-  query {
-    commits {
+  query ($id: String!, $resourceTypeGroup: EnumResourceTypeGroup!) {
+    commits(
+      where: { project: { id: $id }, resourceTypeGroup: $resourceTypeGroup }
+    ) {
       id
       userId
       message
@@ -74,9 +80,9 @@ const userServiceFindUserMock = jest.fn(() => EXAMPLE_USER);
 
 const mockCanActivate = jest.fn(() => true);
 
-describe('CommitService', () => {
+describe("CommitService", () => {
   let app: INestApplication;
-  let apolloClient: ApolloServerTestClient;
+  let apolloClient: ApolloServerBase;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -88,33 +94,38 @@ describe('CommitService', () => {
           provide: CommitService,
           useClass: jest.fn(() => ({
             findOne: commitServiceFindOneMock,
-            findMany: commitServiceFindManyMock
-          }))
+            findMany: commitServiceFindManyMock,
+          })),
         },
         {
           provide: UserService,
           useClass: jest.fn(() => ({
-            findUser: userServiceFindUserMock
-          }))
+            findUser: userServiceFindUserMock,
+          })),
         },
         {
           provide: BuildService,
-          useValue: {}
+          useValue: {},
         },
         {
-          provide: WINSTON_MODULE_PROVIDER,
+          provide: AmplicationLogger,
           useClass: jest.fn(() => ({
-            error: jest.fn()
-          }))
+            error: jest.fn(),
+          })),
         },
         {
           provide: ConfigService,
           useClass: jest.fn(() => ({
-            get: jest.fn()
-          }))
-        }
+            get: jest.fn(),
+          })),
+        },
       ],
-      imports: [GraphQLModule.forRoot({ autoSchemaFile: true })]
+      imports: [
+        GraphQLModule.forRoot<ApolloDriverConfig>({
+          autoSchemaFile: true,
+          driver: ApolloDriver,
+        }),
+      ],
     })
       .overrideGuard(GqlAuthGuard)
       .useValue({ canActivate: mockCanActivate })
@@ -122,16 +133,20 @@ describe('CommitService', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-    const graphqlModule = moduleFixture.get(GraphQLModule) as any;
-    apolloClient = createTestClient(graphqlModule.apolloServer);
+    apolloClient = getApolloServer(app);
   });
 
-  it('should find committing user', async () => {
-    const res = await apolloClient.query({
+  it("should find committing user", async () => {
+    commitServiceFindOneMock.mockReturnValueOnce({
+      ...EXAMPLE_COMMIT,
+      user: null,
+    });
+
+    const res = await apolloClient.executeOperation({
       query: USER_QUERY,
       variables: {
-        id: EXAMPLE_COMMIT_ID
-      }
+        id: EXAMPLE_COMMIT_ID,
+      },
     });
     expect(res.errors).toBeUndefined();
     expect(res.data).toEqual({
@@ -139,49 +154,61 @@ describe('CommitService', () => {
         user: {
           ...EXAMPLE_USER,
           createdAt: EXAMPLE_USER.createdAt.toISOString(),
-          updatedAt: EXAMPLE_USER.updatedAt.toISOString()
-        }
-      }
+          updatedAt: EXAMPLE_USER.updatedAt.toISOString(),
+        },
+      },
     });
-    expect(userServiceFindUserMock).toBeCalledTimes(1);
-    expect(userServiceFindUserMock).toBeCalledWith({
-      where: { id: EXAMPLE_USER_ID }
-    });
+    expect(userServiceFindUserMock).toHaveBeenCalledTimes(1);
+    expect(userServiceFindUserMock).toHaveBeenCalledWith(
+      {
+        where: { id: EXAMPLE_USER_ID },
+        include: { account: true },
+      },
+      true
+    );
   });
 
-  it('should find one Commit', async () => {
-    const res = await apolloClient.query({
+  it("should find one Commit", async () => {
+    const res = await apolloClient.executeOperation({
       query: FIND_ONE_COMMIT_QUERY,
-      variables: { id: EXAMPLE_COMMIT_ID }
+      variables: { id: EXAMPLE_COMMIT_ID },
     });
     expect(res.errors).toBeUndefined();
     expect(res.data).toEqual({
       commit: {
         ...EXAMPLE_COMMIT,
-        createdAt: EXAMPLE_COMMIT.createdAt.toISOString()
-      }
+        createdAt: EXAMPLE_COMMIT.createdAt.toISOString(),
+      },
     });
-    expect(commitServiceFindOneMock).toBeCalledTimes(1);
-    expect(commitServiceFindOneMock).toBeCalledWith({
-      where: { id: EXAMPLE_COMMIT_ID }
+    expect(commitServiceFindOneMock).toHaveBeenCalledTimes(1);
+    expect(commitServiceFindOneMock).toHaveBeenCalledWith({
+      where: { id: EXAMPLE_COMMIT_ID },
     });
   });
 
-  it('should find many Commits', async () => {
-    const res = await apolloClient.query({
+  it("should find many Commits", async () => {
+    const res = await apolloClient.executeOperation({
       query: FIND_MANY_COMMIT_QUERY,
-      variables: {}
+      variables: {
+        id: "exampleProjectId",
+        resourceTypeGroup: EnumResourceTypeGroup.Services,
+      },
     });
     expect(res.errors).toBeUndefined();
     expect(res.data).toEqual({
       commits: [
         {
           ...EXAMPLE_COMMIT,
-          createdAt: EXAMPLE_COMMIT.createdAt.toISOString()
-        }
-      ]
+          createdAt: EXAMPLE_COMMIT.createdAt.toISOString(),
+        },
+      ],
     });
-    expect(commitServiceFindManyMock).toBeCalledTimes(1);
-    expect(commitServiceFindManyMock).toBeCalledWith({});
+    expect(commitServiceFindManyMock).toHaveBeenCalledTimes(1);
+    expect(commitServiceFindManyMock).toHaveBeenCalledWith({
+      where: {
+        project: { id: "exampleProjectId" },
+        resourceTypeGroup: EnumResourceTypeGroup.Services,
+      },
+    });
   });
 });

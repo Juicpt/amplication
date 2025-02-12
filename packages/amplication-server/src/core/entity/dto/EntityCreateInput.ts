@@ -1,38 +1,44 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { WhereParentIdInput } from 'src/dto';
+import { Field, InputType } from "@nestjs/graphql";
+import { WhereParentIdInput } from "../../../dto";
 
 @InputType({
   isAbstract: true,
-  description: undefined
 })
 export class EntityCreateInput {
   @Field(() => String, {
+    nullable: true,
+    description:
+      "allow creating the id for the entity when using import prisma schema because we need it for the relation",
+  })
+  id?: string;
+
+  @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   name!: string;
 
   @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   displayName!: string;
 
   @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   pluralDisplayName!: string;
 
   @Field(() => String, {
     nullable: true,
-    description: undefined
+  })
+  customAttributes?: string;
+
+  @Field(() => String, {
+    nullable: true,
   })
   description?: string;
 
   @Field(() => WhereParentIdInput, {
     nullable: false,
-    description: undefined
   })
-  app!: WhereParentIdInput;
+  resource!: WhereParentIdInput;
 }

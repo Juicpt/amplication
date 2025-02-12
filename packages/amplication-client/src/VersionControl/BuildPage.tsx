@@ -1,106 +1,174 @@
-import React, { useMemo, useState } from "react";
-import { match } from "react-router-dom";
-import { useQuery, useLazyQuery } from "@apollo/client";
-import * as models from "../models";
-
-import PageContent from "../Layout/PageContent";
-import { Snackbar } from "@amplication/design-system";
-import { formatError } from "../util/error";
-
-import useNavigationTabs from "../Layout/UseNavigationTabs";
-import BuildSteps from "./BuildSteps";
+import {
+  CircularProgress,
+  EnumFlexDirection,
+  EnumGapSize,
+  EnumItemsAlign,
+  EnumTextColor,
+  EnumTextStyle,
+  FlexItem,
+  Icon,
+  Snackbar,
+  Text,
+} from "@amplication/ui/design-system";
+import { useQuery } from "@apollo/client";
+import { useContext, useMemo } from "react";
+import { Link, match } from "react-router-dom";
+import { BackNavigation } from "../Components/BackNavigation";
 import { TruncatedId } from "../Components/TruncatedId";
-import ActionLog from "./ActionLog";
-import { GET_BUILD } from "./useBuildWatchStatus";
-import { GET_COMMIT } from "./CommitPage";
+import PageContent, { EnumPageWidth } from "../Layout/PageContent";
+import { resourceThemeMap } from "../Resource/constants";
+import { AppContext } from "../context/appContext";
+import * as models from "../models";
+import { formatError } from "../util/error";
 import { truncateId } from "../util/truncatedId";
-import { ClickableId } from "../Components/ClickableId";
+import { useProjectBaseUrl } from "../util/useProjectBaseUrl";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
+import ActionLog from "./ActionLog";
+import BuildGitLink from "./BuildGitLink";
 import "./BuildPage.scss";
+import useBuildWatchStatus, { GET_BUILD } from "./useBuildWatchStatus";
 
-type LogData = {
+export type LogData = {
   action: models.Action;
   title: string;
   versionNumber: string;
 };
 
 type Props = {
-  match: match<{ application: string; buildId: string }>;
+  match: match<{ resource: string; build: string }>;
+  buildId?: string;
 };
 const CLASS_NAME = "build-page";
-const NAVIGATION_KEY = "BUILDS";
 
-const BuildPage = ({ match }: Props) => {
-  const { application, buildId } = match.params;
-
+const BuildPage = ({ match, buildId }: Props) => {
+  const { build } = match?.params || { build: buildId };
   const truncatedId = useMemo(() => {
-    return truncateId(buildId);
-  }, [buildId]);
+    return truncateId(build);
+  }, [build]);
 
-  useNavigationTabs(
-    application,
-    `${NAVIGATION_KEY}_${buildId}`,
-    match.url,
-    `Build ${truncatedId}`
-  );
+  const { resources } = useContext(AppContext);
 
-  const [error, setError] = useState<Error>();
+  const { baseUrl } = useProjectBaseUrl();
 
-  const [getCommit, { data: commitData }] = useLazyQuery<{
-    commit: models.Commit;
-  }>(GET_COMMIT);
-
-  const { data, error: errorLoading } = useQuery<{
+  const { data: buildData, error: errorLoading } = useQuery<{
     build: models.Build;
   }>(GET_BUILD, {
     variables: {
-      buildId: buildId,
-    },
-    onCompleted: (data) => {
-      getCommit({ variables: { commitId: data.build.commitId } });
+      buildId: build,
     },
   });
 
-  const actionLog = useMemo<LogData | null>(() => {
-    if (!data?.build) return null;
+  const { data: updatedBuild } = useBuildWatchStatus(buildData?.build);
 
-    if (!data.build.action) return null;
+  const currentResource = useMemo(
+    () =>
+      resources.find(
+        (resource) => resource.id === updatedBuild.build?.resourceId
+      ),
+    [resources, updatedBuild]
+  );
+
+  const { baseUrl: resourceBaseUrl } = useResourceBaseUrl({
+    overrideResourceId: updatedBuild.build?.resourceId,
+  });
+
+  const actionLog = useMemo<LogData | null>(() => {
+    if (!updatedBuild?.build) return null;
+
+    if (!updatedBuild.build.action) return null;
 
     return {
-      action: data.build.action,
+      action: updatedBuild.build.action,
       title: "Build log",
-      versionNumber: data.build.version,
+      versionNumber: updatedBuild.build.version,
     };
-  }, [data]);
+  }, [updatedBuild]);
 
-  const errorMessage =
-    formatError(errorLoading) || (error && formatError(error));
+  const screenBuildHeight = window.innerHeight - 360;
+
+  const screenHeight =
+    actionLog?.action.steps.length < 3
+      ? screenBuildHeight - 150
+      : screenBuildHeight - 305;
+
+  const errorMessage = formatError(errorLoading);
 
   return (
     <>
-      <PageContent className={CLASS_NAME}>
-        {!data ? (
-          "loading..."
+      <PageContent
+        pageWidth={EnumPageWidth.Full}
+        className={CLASS_NAME}
+        pageTitle={`Build ${truncatedId}`}
+      >
+        {!updatedBuild ? (
+          <CircularProgress centerToParent />
         ) : (
           <>
-            <div className={`${CLASS_NAME}__header`}>
-              <h2>
-                Build <TruncatedId id={data.build.id} />
-              </h2>
-              {commitData && (
-                <ClickableId
-                  label="Commit"
-                  to={`/${application}/commits/${commitData.commit.id}`}
-                  id={commitData.commit.id}
-                  eventData={{
-                    eventName: "commitHeaderIdClick",
-                  }}
-                />
-              )}
-            </div>
+            {buildData && (
+              <FlexItem
+                direction={EnumFlexDirection.Column}
+                className={`${CLASS_NAME}__header`}
+              >
+                <Text textStyle={EnumTextStyle.Tag}>
+                  <BackNavigation
+                    to={`${baseUrl}/commits/${updatedBuild.build.commitId}`}
+                    label={
+                      <>
+                        &nbsp;Return to Commit&nbsp;
+                        <TruncatedId id={buildData.build.commitId} />
+                      </>
+                    }
+                    iconSize="xsmall"
+                  />
+                </Text>
+
+                <FlexItem
+                  direction={EnumFlexDirection.Row}
+                  itemsAlign={EnumItemsAlign.End}
+                  gap={EnumGapSize.None}
+                  end={
+                    <BuildGitLink
+                      build={updatedBuild.build}
+                      textColor={EnumTextColor.ThemeTurquoise}
+                    />
+                  }
+                  start={
+                    <>
+                      <Link to={`${resourceBaseUrl}`}>
+                        <FlexItem
+                          itemsAlign={EnumItemsAlign.Center}
+                          gap={EnumGapSize.Small}
+                          className={`${CLASS_NAME}__header__title__service`}
+                        >
+                          <Icon
+                            icon={
+                              resourceThemeMap[currentResource?.resourceType]
+                                ?.icon
+                            }
+                            size="large"
+                            color={EnumTextColor.ThemeTurquoise}
+                          />
+                          <Text textColor={EnumTextColor.ThemeTurquoise}>
+                            {currentResource?.name}
+                          </Text>
+                        </FlexItem>
+                      </Link>
+                      <h3>
+                        Commit&nbsp;
+                        <span>
+                          <TruncatedId id={buildData.build.commitId} />
+                        </span>
+                      </h3>
+                    </>
+                  }
+                ></FlexItem>
+              </FlexItem>
+            )}
             <div className={`${CLASS_NAME}__build-details`}>
-              <BuildSteps build={data.build} onError={setError} />
               <aside className="log-container">
                 <ActionLog
+                  height={screenHeight}
+                  dynamicHeight={true}
                   action={actionLog?.action}
                   title={actionLog?.title || ""}
                   versionNumber={actionLog?.versionNumber || ""}
@@ -110,7 +178,7 @@ const BuildPage = ({ match }: Props) => {
           </>
         )}
       </PageContent>
-      <Snackbar open={Boolean(error || errorLoading)} message={errorMessage} />
+      <Snackbar open={Boolean(errorLoading)} message={errorMessage} />
     </>
   );
 };

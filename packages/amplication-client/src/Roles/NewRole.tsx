@@ -1,68 +1,56 @@
-import React, { useCallback, useRef, useState } from "react";
-import { gql, useMutation, Reference } from "@apollo/client";
-import { Formik, Form } from "formik";
-import { isEmpty } from "lodash";
+import { Snackbar, TextField } from "@amplication/ui/design-system";
 import classNames from "classnames";
-import { camelCase } from "camel-case";
-import { TextField, Snackbar } from "@amplication/design-system";
-import { formatError } from "../util/error";
+import { Form, Formik } from "formik";
+import { isEmpty } from "lodash";
+import { useCallback, useRef, useState } from "react";
 import { Button, EnumButtonStyle } from "../Components/Button";
+import {
+  LicenseIndicatorContainer,
+  LicensedResourceType,
+} from "../Components/LicenseIndicatorContainer";
 import * as models from "../models";
-import { validate } from "../util/formikValidateJsonSchema";
+import { formatError } from "../util/error";
+import {
+  validate,
+  validationErrorMessages,
+} from "../util/formikValidateJsonSchema";
+import useRoles from "./hooks/useRoles";
 import "./NewRole.scss";
 
-const INITIAL_VALUES: Partial<models.AppRole> = {
+const INITIAL_VALUES: Partial<models.Role> = {
   name: "",
-  displayName: "",
-  description: "",
 };
 
 type Props = {
-  applicationId: string;
-  onRoleAdd?: (role: models.AppRole) => void;
+  onRoleAdd?: (role: models.Role) => void;
+  disabled?: boolean;
 };
 
+const { AT_LEAST_TWO_CHARACTERS } = validationErrorMessages;
+
 const FORM_SCHEMA = {
-  required: ["displayName"],
+  required: ["name"],
   properties: {
-    displayName: {
+    name: {
       type: "string",
       minLength: 2,
+    },
+  },
+  errorMessage: {
+    properties: {
+      name: AT_LEAST_TWO_CHARACTERS,
     },
   },
 };
 const CLASS_NAME = "new-role";
 
-const NewRole = ({ onRoleAdd, applicationId }: Props) => {
-  const [createRole, { error, loading }] = useMutation(CREATE_ROLE, {
-    update(cache, { data }) {
-      if (!data) return;
+const NewRole = ({ onRoleAdd, disabled }: Props) => {
+  const {
+    createRole,
+    createRoleError: error,
+    createRoleLoading: loading,
+  } = useRoles();
 
-      const newAppRole = data.createAppRole;
-
-      cache.modify({
-        fields: {
-          appRoles(existingAppRoleRefs = [], { readField }) {
-            const newAppRoleRef = cache.writeFragment({
-              data: newAppRole,
-              fragment: NEW_ROLE_FRAGMENT,
-            });
-
-            if (
-              existingAppRoleRefs.some(
-                (appRoleRef: Reference) =>
-                  readField("id", appRoleRef) === newAppRole.id
-              )
-            ) {
-              return existingAppRoleRefs;
-            }
-
-            return [...existingAppRoleRefs, newAppRoleRef];
-          },
-        },
-      });
-    },
-  });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [autoFocus, setAutoFocus] = useState<boolean>(false);
 
@@ -71,24 +59,19 @@ const NewRole = ({ onRoleAdd, applicationId }: Props) => {
       setAutoFocus(true);
       createRole({
         variables: {
-          data: {
-            ...data,
-            name: camelCase(data.displayName),
-
-            app: { connect: { id: applicationId } },
-          },
+          data,
         },
       })
         .then((result) => {
           if (onRoleAdd) {
-            onRoleAdd(result.data.createAppRole);
+            onRoleAdd(result.data.createRole);
           }
           actions.resetForm();
           inputRef.current?.focus();
         })
         .catch(console.error);
     },
-    [createRole, applicationId, inputRef, onRoleAdd]
+    [createRole, onRoleAdd]
   );
 
   const errorMessage = formatError(error);
@@ -97,7 +80,7 @@ const NewRole = ({ onRoleAdd, applicationId }: Props) => {
     <div className={CLASS_NAME}>
       <Formik
         initialValues={INITIAL_VALUES}
-        validate={(values: Partial<models.AppRole>) =>
+        validate={(values: Partial<models.Role>) =>
           validate(values, FORM_SCHEMA)
         }
         validateOnBlur={false}
@@ -107,9 +90,9 @@ const NewRole = ({ onRoleAdd, applicationId }: Props) => {
           <Form className={`${CLASS_NAME}__add-field`}>
             <TextField
               required
-              name="displayName"
+              name="name"
               label="New Role Name"
-              disabled={loading}
+              disabled={loading || disabled}
               inputRef={inputRef}
               placeholder="Add role"
               autoComplete="off"
@@ -117,15 +100,19 @@ const NewRole = ({ onRoleAdd, applicationId }: Props) => {
               hideLabel
               className={`${CLASS_NAME}__add-field__text`}
             />
-            <Button
-              buttonStyle={EnumButtonStyle.Clear}
-              icon="plus"
-              className={classNames(`${CLASS_NAME}__add-field__button`, {
-                [`${CLASS_NAME}__add-field__button--show`]: !isEmpty(
-                  formik.values.displayName
-                ),
-              })}
-            />
+            <LicenseIndicatorContainer
+              licensedResourceType={LicensedResourceType.Service}
+            >
+              <Button
+                buttonStyle={EnumButtonStyle.Text}
+                icon="plus"
+                className={classNames(`${CLASS_NAME}__add-field__button`, {
+                  [`${CLASS_NAME}__add-field__button--show`]: !isEmpty(
+                    formik.values.displayName
+                  ),
+                })}
+              />
+            </LicenseIndicatorContainer>
           </Form>
         )}
       </Formik>
@@ -135,23 +122,3 @@ const NewRole = ({ onRoleAdd, applicationId }: Props) => {
 };
 
 export default NewRole;
-
-const CREATE_ROLE = gql`
-  mutation createAppRole($data: AppRoleCreateInput!) {
-    createAppRole(data: $data) {
-      id
-      name
-      displayName
-      description
-    }
-  }
-`;
-
-const NEW_ROLE_FRAGMENT = gql`
-  fragment NewAppRole on AppRole {
-    id
-    name
-    displayName
-    description
-  }
-`;

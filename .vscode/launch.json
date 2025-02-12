@@ -9,48 +9,55 @@
       "request": "attach",
       "name": "Attach NestJS WS",
       "port": 9229,
-      "restart": true,
-      "stopOnEntry": false,
-      "protocol": "inspector"
+      "restart": true
     },
     {
+      "name": "Debug Client",
       "type": "chrome",
       "request": "launch",
-      "name": "Launch Chrome against localhost",
       "url": "http://localhost:3001",
-      "webRoot": "${workspaceFolder}/amplication-client"
+      "webRoot": "${workspaceFolder}/packages/amplication-client"
     },
     {
       "type": "node",
+      "name": "Debug DSG generate-local-code",
       "request": "launch",
-      "name": "Jest Current File (Server)",
-      "program": "${workspaceFolder}/packages/amplication-server/node_modules/.bin/jest",
-      "args": ["${fileBasenameNoExtension}"],
-      "cwd": "${workspaceFolder}/packages/amplication-server",
-      "console": "internalConsole",
-      "disableOptimisticBPs": true,
-      "windows": {
-        "program": "${workspaceFolder}/packages/amplication-server/node_modules/jest/bin/jest"
-      }
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "generate-local-code", "data-service-generator"],
+      "cwd": "${workspaceRoot}",
+      "outputCapture": "std",
+      "env": {}
     },
     {
-      "name": "Generate Test Data Service",
+      "type": "node",
+      "name": "Debug Plugin API",
       "request": "launch",
-      "runtimeArgs": ["run-script", "generate-test-data-service"],
-      "runtimeExecutable": "npm",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "pwa-node",
-      "cwd": "${workspaceFolder}/packages/amplication-data-service-generator",
-      "console": "internalConsole"
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "amplication-plugin-api"],
+      "cwd": "${workspaceRoot}",
+      "outputCapture": "std",
+      "env": {}
     },
     {
-      "name": "Debug Test Data Service",
-      "request": "launch",
-      "runtimeArgs": ["run-script", "start", "--", "--debug"],
-      "runtimeExecutable": "npm",
-      "cwd": "${workspaceFolder}/packages/amplication-data-service-generator/generated",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "node"
+      "type": "node",
+      "name": "Attach Amplication Server",
+      "request": "attach",
+      "sourceMaps": true,
+      "port": 7000
+    },
+    {
+      "type": "node",
+      "name": "Attach Amplication Plugin API",
+      "request": "attach",
+      "sourceMaps": true,
+      "port": 7005
+    },
+    {
+      "type": "node",
+      "name": "Attach Amplication Git Sync Manager",
+      "request": "attach",
+      "sourceMaps": true,
+      "port": 7001
     }
   ]
 }

@@ -1,14 +1,13 @@
-import { ExceptionFilter, Catch, ArgumentsHost, Inject } from '@nestjs/common';
-import { Request, Response } from 'express';
-import { Logger } from 'winston';
-
-import { ConfigService } from '@nestjs/config';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { ExceptionFilter, Catch, ArgumentsHost, Inject } from "@nestjs/common";
+import { Request, Response } from "express";
+import { ConfigService } from "@nestjs/config";
+import { AmplicationLogger } from "@amplication/util/nestjs/logging";
 
 @Catch(Error)
 export class GithubAuthExceptionFilter implements ExceptionFilter {
   constructor(
-    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+    @Inject(AmplicationLogger)
+    private readonly logger: AmplicationLogger,
     private readonly configService: ConfigService
   ) {}
 
@@ -17,7 +16,7 @@ export class GithubAuthExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    this.logger.error(exception.message, { request });
+    this.logger.error(exception.message, exception, { request });
 
     response.redirect(`/login/?error=${encodeURIComponent(exception.message)}`);
   }

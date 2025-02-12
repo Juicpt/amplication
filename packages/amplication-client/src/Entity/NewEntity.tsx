@@ -1,32 +1,54 @@
-import React, { useCallback, useEffect, useContext } from "react";
-import { useHistory } from "react-router-dom";
-import { Formik, Form } from "formik";
-import { gql, useMutation, Reference } from "@apollo/client";
-import { GlobalHotKeys } from "react-hotkeys";
+import {
+  Dialog,
+  EnumFlexItemMargin,
+  FlexItem,
+  Snackbar,
+  Text,
+  TextField,
+  EnumTextAlign,
+  EnumFlexDirection,
+} from "@amplication/ui/design-system";
+import { Reference, useMutation } from "@apollo/client";
+import { Form, Formik } from "formik";
 import { pascalCase } from "pascal-case";
-import { formatError } from "../util/error";
-import * as models from "../models";
-import { TextField, Snackbar } from "@amplication/design-system";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { GlobalHotKeys } from "react-hotkeys";
+import { useHistory } from "react-router-dom";
 import { Button, EnumButtonStyle } from "../Components/Button";
 import {
   generatePluralDisplayName,
   generateSingularDisplayName,
 } from "../Components/PluralDisplayNameField";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
-import { useTracking } from "../util/analytics";
+import { EnumImages, SvgThemeImage } from "../Components/SvgThemeImage";
+import {
+  CREATE_DEFAULT_ENTITIES,
+  CREATE_ENTITY,
+  NEW_ENTITY_FRAGMENT,
+} from "../Workspaces/queries/entitiesQueries";
+import { AppContext } from "../context/appContext";
+import * as models from "../models";
+import { formatError } from "../util/error";
 import { validate } from "../util/formikValidateJsonSchema";
 import { CROSS_OS_CTRL_ENTER } from "../util/hotkeys";
-import { SvgThemeImage, EnumImages } from "../Components/SvgThemeImage";
 import "./NewEntity.scss";
+import { USER_ENTITY } from "./constants";
+import useModule from "../Modules/hooks/useModule";
+import CreateWithJovuButton from "../Assistant/CreateWithJovuButton";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
 
-type CreateEntityType = Omit<models.EntityCreateInput, "app">;
+type CreateEntityType = Omit<models.EntityCreateInput, "resource">;
 
 type DType = {
   createOneEntity: models.Entity;
 };
 
+export type TEntities = {
+  createDefaultAuthEntity: models.Entity;
+};
+
 type Props = {
-  applicationId: string;
+  resourceId: string;
+  onSuccess: () => void;
 };
 
 const INITIAL_VALUES: CreateEntityType = {
@@ -46,24 +68,47 @@ const FORM_SCHEMA = {
   },
 };
 const CLASS_NAME = "new-entity";
+const DATE_CREATED_FIELD = "createdAt";
 
 const keyMap = {
   SUBMIT: CROSS_OS_CTRL_ENTER,
 };
 
-const NewEntity = ({ applicationId }: Props) => {
-  const { trackEvent } = useTracking();
-  const pendingChangesContext = useContext(PendingChangesContext);
+const NewEntity = ({ resourceId, onSuccess }: Props) => {
+  const history = useHistory();
+  const { addEntity } = useContext(AppContext);
+
+  const { baseUrl } = useResourceBaseUrl({ overrideResourceId: resourceId });
+
+  const [confirmInstall, setConfirmInstall] = useState<boolean>(false);
+  const { findModuleRefetch } = useModule();
+
+  const refetchModules = useCallback(() => {
+    findModuleRefetch({
+      where: {
+        resource: { id: resourceId },
+      },
+      orderBy: {
+        [DATE_CREATED_FIELD]: models.SortOrder.Asc,
+      },
+    });
+  }, [resourceId, findModuleRefetch]);
+
+  const onEntityCreated = useCallback(
+    (entity: models.Entity) => {
+      addEntity(entity.id);
+      refetchModules();
+      onSuccess();
+      history.push(`entities/${entity.id}`);
+    },
+    [refetchModules, addEntity, onSuccess, history]
+  );
 
   const [createEntity, { error, data, loading }] = useMutation<DType>(
     CREATE_ENTITY,
     {
       onCompleted: (data) => {
-        pendingChangesContext.addEntity(data.createOneEntity.id);
-        trackEvent({
-          eventName: "createEntity",
-          entityName: data.createOneEntity.displayName,
-        });
+        onEntityCreated(data.createOneEntity);
       },
       update(cache, { data }) {
         if (!data) return;
@@ -94,10 +139,47 @@ const NewEntity = ({ applicationId }: Props) => {
       },
     }
   );
-  const history = useHistory();
+
+  const [createDefaultAuthEntity, { data: defaultEntityData }] =
+    useMutation<TEntities>(CREATE_DEFAULT_ENTITIES, {
+      onCompleted: (data) => {
+        if (!data) return;
+        const userEntity = data.createDefaultAuthEntity;
+        onEntityCreated(userEntity);
+      },
+      update(cache, { data }) {
+        if (!data) return;
+        const userEntity = data.createDefaultAuthEntity;
+        const newEntity = userEntity;
+        cache.modify({
+          fields: {
+            entities(existingEntityRefs = [], { readField }) {
+              const newEntityRef = cache.writeFragment({
+                data: newEntity,
+                fragment: NEW_ENTITY_FRAGMENT,
+              });
+              if (
+                existingEntityRefs.some(
+                  (EntityRef: Reference) =>
+                    readField("id", EntityRef) === newEntity.id
+                )
+              ) {
+                return existingEntityRefs;
+              }
+              return [...existingEntityRefs, newEntityRef];
+            },
+          },
+        });
+      },
+    });
 
   const handleSubmit = useCallback(
     (data: CreateEntityType) => {
+      if (data.displayName.toLowerCase() === USER_ENTITY.toLowerCase()) {
+        setConfirmInstall(true);
+        return;
+      }
+
       const displayName = data.displayName.trim();
       const pluralDisplayName = generatePluralDisplayName(displayName);
       const singularDisplayName = generateSingularDisplayName(displayName);
@@ -110,29 +192,77 @@ const NewEntity = ({ applicationId }: Props) => {
             displayName,
             name,
             pluralDisplayName,
-            app: { connect: { id: applicationId } },
+            resource: { connect: { id: resourceId } },
           },
         },
       }).catch(console.error);
     },
-    [createEntity, applicationId]
+    [createEntity, resourceId]
   );
+
+  const handleDismissConfirmationInstall = useCallback(() => {
+    setConfirmInstall(false);
+  }, [setConfirmInstall]);
+
+  const handleConfirmationInstall = useCallback(() => {
+    createDefaultAuthEntity({
+      variables: {
+        data: {
+          resourceId,
+        },
+      },
+    }).catch(console.error);
+  }, [createDefaultAuthEntity, resourceId]);
 
   useEffect(() => {
     if (data) {
-      history.push(`/${applicationId}/entities/${data.createOneEntity.id}`);
+      history.push(`${baseUrl}/entities/${data.createOneEntity.id}`);
     }
-  }, [history, data, applicationId]);
+  }, [history, data, baseUrl]);
+
+  useEffect(() => {
+    if (defaultEntityData) {
+      const userEntity = defaultEntityData.createDefaultAuthEntity;
+      history.push(`${baseUrl}/entities/${userEntity.id}`);
+    }
+  }, [history, defaultEntityData, baseUrl]);
 
   const errorMessage = formatError(error);
 
   return (
     <div className={CLASS_NAME}>
       <SvgThemeImage image={EnumImages.Entities} />
-      <div className={`${CLASS_NAME}__instructions`}>
+      <Text textAlign={EnumTextAlign.Center}>
         Give your new entity a descriptive name. <br />
         For example: Customer, Support Ticket, Purchase Order...
-      </div>
+      </Text>
+
+      <Dialog
+        title="Restore 'User' Entity?"
+        isOpen={confirmInstall}
+        onDismiss={handleDismissConfirmationInstall}
+      >
+        <FlexItem margin={EnumFlexItemMargin.Both}>
+          <Text>
+            We've noticed you're creating a new 'User' entity. This entity is
+            used by the Authentication plugin.
+          </Text>
+        </FlexItem>
+        <FlexItem margin={EnumFlexItemMargin.Both}>
+          <Text>
+            Restore the Default 'User' Entity - This will re-establish the
+            original 'User' entity provided by Amplication, including all
+            associated settings and functionalities.
+          </Text>
+        </FlexItem>
+
+        <Button
+          buttonStyle={EnumButtonStyle.Primary}
+          onClick={handleConfirmationInstall}
+        >
+          Restore Default
+        </Button>
+      </Dialog>
       <Formik
         initialValues={INITIAL_VALUES}
         validate={(values: CreateEntityType) => validate(values, FORM_SCHEMA)}
@@ -155,13 +285,24 @@ const NewEntity = ({ applicationId }: Props) => {
                 placeholder="Type New Entity Name"
                 autoComplete="off"
               />
-              <Button
-                type="submit"
-                buttonStyle={EnumButtonStyle.Primary}
-                disabled={!formik.isValid || loading}
+              <FlexItem
+                direction={EnumFlexDirection.Column}
+                margin={EnumFlexItemMargin.None}
               >
-                Create Entity
-              </Button>
+                <Button
+                  type="submit"
+                  buttonStyle={EnumButtonStyle.Primary}
+                  disabled={!formik.isValid || loading}
+                >
+                  Create Entity
+                </Button>
+                <CreateWithJovuButton
+                  message={`Create a new entity ${formik.values.displayName}. Create common fields that should be part of this data model, and create relations to other entities when needed.`}
+                  onCreateWithJovuClicked={onSuccess}
+                  disabled={!formik.isValid || loading}
+                  eventOriginLocation="New Entity Dialog"
+                />
+              </FlexItem>
             </Form>
           );
         }}
@@ -172,29 +313,3 @@ const NewEntity = ({ applicationId }: Props) => {
 };
 
 export default NewEntity;
-
-const CREATE_ENTITY = gql`
-  mutation createEntity($data: EntityCreateInput!) {
-    createOneEntity(data: $data) {
-      id
-      name
-      fields {
-        id
-        name
-        dataType
-      }
-    }
-  }
-`;
-
-const NEW_ENTITY_FRAGMENT = gql`
-  fragment NewEntity on Entity {
-    id
-    name
-    fields {
-      id
-      name
-      dataType
-    }
-  }
-`;

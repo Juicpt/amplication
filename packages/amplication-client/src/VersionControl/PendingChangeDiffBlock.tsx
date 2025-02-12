@@ -1,11 +1,14 @@
-import React, { useMemo } from "react";
-import YAML from "yaml";
+import { CircularProgress, CodeCompare } from "@amplication/ui/design-system";
 import { gql, useQuery } from "@apollo/client";
-import omitDeep from "deepdash-es/omitDeep";
-import ReactDiffViewer, { DiffMethod } from "react-diff-viewer";
+import { useMemo } from "react";
+import YAML from "yaml";
 import * as models from "../models";
-import { EnumCompareType, DIFF_STYLES } from "./PendingChangeDiffEntity";
 import "./PendingChangeDiff.scss";
+import { EnumCompareType } from "./PendingChangeDiffEntity";
+
+// This must be here unless we get rid of deepdash as it does not support ES imports
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const omitDeep = require("deepdash/omitDeep");
 
 const CLASS_NAME = "pending-change-diff";
 const CURRENT_VERSION_NUMBER = 0;
@@ -23,47 +26,44 @@ type TData = {
 type Props = {
   change: models.PendingChange;
   compareType?: EnumCompareType;
-  splitView: boolean;
 };
 
 const PendingChangeDiffBlock = ({
   change,
   compareType = EnumCompareType.Pending,
-  splitView,
 }: Props) => {
-  const { data: dataOtherVersion, loading: loadingOtherVersion } = useQuery<
-    TData
-  >(GET_BLOCK_VERSION, {
-    variables: {
-      id: change.resourceId,
-      whereVersion:
-        compareType === EnumCompareType.Pending
-          ? {
-              not: CURRENT_VERSION_NUMBER,
-            }
-          : {
-              equals: change.versionNumber > 1 ? change.versionNumber - 1 : -1,
-            },
-    },
-    fetchPolicy: "no-cache",
-  });
+  const { data: dataOtherVersion, loading: loadingOtherVersion } =
+    useQuery<TData>(GET_BLOCK_VERSION, {
+      variables: {
+        id: change.originId,
+        whereVersion:
+          compareType === EnumCompareType.Pending
+            ? {
+                not: CURRENT_VERSION_NUMBER,
+              }
+            : {
+                equals:
+                  change.versionNumber > 1 ? change.versionNumber - 1 : -1,
+              },
+      },
+      fetchPolicy: "no-cache",
+    });
 
-  const { data: dataCurrentVersion, loading: loadingCurrentVersion } = useQuery<
-    TData
-  >(GET_BLOCK_VERSION, {
-    variables: {
-      id: change.resourceId,
-      whereVersion:
-        compareType === EnumCompareType.Pending
-          ? {
-              equals: CURRENT_VERSION_NUMBER,
-            }
-          : {
-              equals: change.versionNumber,
-            },
-    },
-    fetchPolicy: "no-cache",
-  });
+  const { data: dataCurrentVersion, loading: loadingCurrentVersion } =
+    useQuery<TData>(GET_BLOCK_VERSION, {
+      variables: {
+        id: change.originId,
+        whereVersion:
+          compareType === EnumCompareType.Pending
+            ? {
+                equals: CURRENT_VERSION_NUMBER,
+              }
+            : {
+                equals: change.versionNumber,
+              },
+      },
+      fetchPolicy: "no-cache",
+    });
 
   const newValue = useMemo(() => {
     return getBlockVersionYAML(dataCurrentVersion);
@@ -76,17 +76,9 @@ const PendingChangeDiffBlock = ({
   return (
     <div className={CLASS_NAME}>
       {loadingCurrentVersion || loadingOtherVersion ? (
-        "Loading..."
+        <CircularProgress centerToParent />
       ) : (
-        <ReactDiffViewer
-          styles={DIFF_STYLES}
-          compareMethod={DiffMethod.WORDS}
-          oldValue={otherValue}
-          newValue={newValue}
-          leftTitle={splitView ? "This Version" : undefined}
-          rightTitle="Previous Version"
-          splitView={splitView}
-        />
+        <CodeCompare oldVersion={otherValue} newVersion={newValue} />
       )}
     </div>
   );

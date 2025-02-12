@@ -1,6 +1,7 @@
+import { HorizontalRule } from "@amplication/ui/design-system";
 import { gql, useQuery } from "@apollo/client";
 import { useFormikContext } from "formik";
-import React from "react";
+import { useEffect, useState } from "react";
 import * as models from "../models";
 import { EntityRelationFieldsChart } from "./EntityRelationFieldsChart";
 import "./RelatedEntityFieldField.scss";
@@ -13,7 +14,9 @@ type Props = {
 
 const RelatedEntityFieldField = ({ entityDisplayName }: Props) => {
   const formik = useFormikContext<models.EntityField>();
-
+  const [entityField, setEntityField] = useState<models.EntityField | null>(
+    null
+  );
   const { data } = useQuery<{ entity: models.Entity }>(
     GET_ENTITY_FIELD_BY_PERMANENT_ID,
     {
@@ -24,26 +27,34 @@ const RelatedEntityFieldField = ({ entityDisplayName }: Props) => {
     }
   );
 
-  const relatedField =
-    data &&
-    data.entity &&
-    data.entity.fields &&
-    data.entity.fields.length &&
-    data.entity.fields[0];
+  useEffect(() => {
+    if (!data) return;
+
+    const relatedField =
+      (data.entity?.fields &&
+        data.entity.fields.length &&
+        data.entity.fields[0]) ||
+      undefined;
+
+    setEntityField(relatedField);
+  }, [data, formik.values]);
 
   return (
     <div className={CLASS_NAME}>
-      {data && relatedField && (
-        <EntityRelationFieldsChart
-          fixInPlace={false}
-          applicationId={data.entity.appId}
-          entityId={data.entity.id}
-          field={formik.values}
-          entityName={entityDisplayName}
-          relatedField={relatedField}
-          relatedEntityName={data.entity.displayName}
-          onSubmit={() => {}}
-        />
+      {entityField && data && (
+        <>
+          <HorizontalRule />
+          <EntityRelationFieldsChart
+            resourceId={data.entity.resourceId}
+            entityId={data.entity.id}
+            field={formik.values}
+            entityName={entityDisplayName}
+            relatedField={entityField}
+            relatedEntityName={data.entity.displayName}
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
+            onSubmit={() => {}}
+          />
+        </>
       )}
     </div>
   );
@@ -59,7 +70,7 @@ export const GET_ENTITY_FIELD_BY_PERMANENT_ID = gql`
     entity(where: { id: $entityId }) {
       id
       displayName
-      appId
+      resourceId
       fields(where: { permanentId: { equals: $fieldPermanentId } }) {
         id
         permanentId

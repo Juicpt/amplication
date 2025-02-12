@@ -1,33 +1,35 @@
 @import "../style/index.scss";
 
+$log-min-width: 360px;
 $icon-size: 20px;
 
 .build-page {
   &__header {
-    margin-bottom: var(--double-spacing);
-    color: var(--black80);
+    gap: var(--double-spacing);
+    margin-bottom: var(--large-spacing);
 
-    @include flexFullRowWithSpacing;
-    align-items: center;
-
-    .truncated-id {
-      @include semiBold;
-      color: var(--black100);
-    }
-
-    .clickable-id {
-      color: var(--black80);
-      a {
-        color: var(--black100);
+    &__title__service {
+      .amp-icon {
+        @include regular-12;
+      }
+      .amp-text {
+        @include regular-10;
       }
     }
+    h3 {
+      margin: 0;
+      @include bold-14;
+      color: #ffffff;
+    }
   }
+
   &__build-details {
     display: flex;
     direction: row;
 
     .log-container {
-      margin-left: var(--double-spacing);
+      flex: 1;
+      min-width: $log-min-width;
     }
   }
 

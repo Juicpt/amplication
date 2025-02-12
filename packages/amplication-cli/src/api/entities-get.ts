@@ -1,13 +1,13 @@
-import { ApolloClient, gql, NormalizedCacheObject } from '@apollo/client/core';
+import { ApolloClient, gql, NormalizedCacheObject } from "@apollo/client/core";
 
-import * as models from '../models';
+import * as models from "../models";
 
 const GET_ENTITY = gql`
   query getEntity($id: String!) {
     entity(where: { id: $id }) {
       id
       name
-      appId
+      resourceId
       displayName
       pluralDisplayName
       description

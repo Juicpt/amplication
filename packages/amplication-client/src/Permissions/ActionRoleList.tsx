@@ -5,7 +5,7 @@ import * as models from "../models";
 import { ActionRole } from "./ActionRole";
 
 type Props = {
-  availableRoles: models.AppRole[];
+  availableRoles: models.ResourceRole[];
   selectedRoleIds: Set<string>;
   onChange: (selectedRoleIds: Set<string>) => void;
   debounceMS: number;
@@ -17,9 +17,8 @@ export const ActionRoleList = ({
   debounceMS,
   onChange,
 }: Props) => {
-  const [selectedRoleList, setSelectedRoleList] = useState<Set<string>>(
-    selectedRoleIds
-  );
+  const [selectedRoleList, setSelectedRoleList] =
+    useState<Set<string>>(selectedRoleIds);
 
   // onChange is wrapped with a useDebouncedCallback so it won't be called more often than defined in debounceMs
   // This function is called by handleRoleSelect as it can not manage dependencies
@@ -28,7 +27,7 @@ export const ActionRoleList = ({
   }, debounceMS);
 
   const handleRoleSelect = useCallback(
-    ({ id }: models.AppRole, checked: boolean) => {
+    ({ id }: models.ResourceRole, checked: boolean) => {
       const newSet = new Set(selectedRoleList);
       if (checked) {
         newSet.add(id);
@@ -41,12 +40,16 @@ export const ActionRoleList = ({
     [setSelectedRoleList, selectedRoleList, debouncedOnChange]
   );
 
-  return availableRoles.map((role) => (
-    <ActionRole
-      key={role.id}
-      role={role}
-      onClick={handleRoleSelect}
-      selected={selectedRoleList.has(role.id)}
-    />
-  ));
+  return (
+    <>
+      {availableRoles.map((role) => (
+        <ActionRole
+          key={role.id}
+          role={role}
+          onClick={handleRoleSelect}
+          selected={selectedRoleList.has(role.id)}
+        />
+      ))}
+    </>
+  );
 };

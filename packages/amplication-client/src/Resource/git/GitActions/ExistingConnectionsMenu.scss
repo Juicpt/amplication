@@ -1,0 +1,15 @@
+@import "../../../style/index.scss";
+
+.git-organization-select-menu {
+  &__label-title {
+    @include regular-10;
+    padding-bottom: var(--icon-spacing);
+    color: var(--gray-20);
+  }
+
+  &__add-item {
+    padding: var(--icon-spacing) 0;
+    display: flex;
+    align-items: center;
+  }
+}

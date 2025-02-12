@@ -1,22 +1,31 @@
-import React, { useCallback, useMemo, useContext, useState } from "react";
-import { useRouteMatch, useHistory } from "react-router-dom";
+import { types } from "@amplication/code-gen-types";
+import {
+  EnumItemsAlign,
+  EnumTextColor,
+  FlexItem,
+  Snackbar,
+  TabContentTitle,
+  Text,
+} from "@amplication/ui/design-system";
 import { gql, useMutation, useQuery } from "@apollo/client";
-import { types } from "@amplication/data";
-import { Snackbar } from "@amplication/design-system";
+import { useCallback, useContext, useMemo, useState } from "react";
+import { useHistory, useRouteMatch } from "react-router-dom";
 
-import { formatError } from "../util/error";
 import * as models from "../models";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
+import { formatError } from "../util/error";
 
-import { useTracking } from "../util/analytics";
-import { SYSTEM_DATA_TYPES } from "./constants";
+import { AppContext } from "../context/appContext";
+import { DeleteEntityField } from "./DeleteEntityField";
 import EntityFieldForm, { Values } from "./EntityFieldForm";
 import {
   RelatedFieldDialog,
   Values as RelatedFieldValues,
 } from "./RelatedFieldDialog";
-import { DeleteEntityField } from "./DeleteEntityField";
-import "./EntityField.scss";
+import {
+  AUTHENTICATION_ENTITY_DATA_TYPES,
+  SYSTEM_DATA_TYPES,
+} from "./constants";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
 
 type TData = {
   entity: models.Entity;
@@ -29,38 +38,44 @@ type UpdateData = {
 const CLASS_NAME = "entity-field";
 
 const EntityField = () => {
-  const { trackEvent } = useTracking();
   const [lookupPendingData, setLookupPendingData] = useState<Values | null>(
     null
   );
-  const pendingChangesContext = useContext(PendingChangesContext);
+  const { addEntity, currentWorkspace, currentProject } =
+    useContext(AppContext);
   const history = useHistory();
   const [error, setError] = useState<Error>();
 
   const match = useRouteMatch<{
-    application: string;
+    resource: string;
     entity: string;
     field: string;
-  }>("/:application/entities/:entity/fields/:field");
+  }>([
+    "/:workspace/platform/:project/:resource/entities/:entity/fields/:field",
+    "/:workspace/:project/:resource/entities/:entity/fields/:field",
+  ]);
 
-  const { application, entity, field } = match?.params ?? {};
+  const { resource, entity, field } = match?.params ?? {};
 
-  if (!application) {
-    throw new Error("application parameters is required in the query string");
+  const { baseUrl } = useResourceBaseUrl({ overrideResourceId: resource });
+
+  if (!resource) {
+    throw new Error("resource parameters is required in the query string");
   }
 
-  const { data, error: loadingError, loading } = useQuery<TData>(
-    GET_ENTITY_FIELD,
-    {
-      variables: {
-        entity,
-        field,
-      },
-    }
-  );
+  const {
+    data,
+    error: loadingError,
+    loading,
+  } = useQuery<TData>(GET_ENTITY_FIELD, {
+    variables: {
+      entity,
+      field,
+    },
+  });
 
   const entityField = data?.entity.fields?.[0];
-  const entityDisplayName = data?.entity.displayName;
+  const entityRecord = data?.entity;
 
   const [updateEntityField, { error: updateError }] = useMutation<UpdateData>(
     UPDATE_ENTITY_FIELD,
@@ -82,19 +97,14 @@ const EntityField = () => {
         }
       },
       onCompleted: (data) => {
-        pendingChangesContext.addEntity(entity);
-        trackEvent({
-          eventName: "updateEntityField",
-          entityFieldName: data.updateEntityField.displayName,
-          dataType: data.updateEntityField.dataType,
-        });
+        entity && addEntity(entity);
       },
     }
   );
 
   const handleDeleteField = useCallback(() => {
-    history.push(`/${application}/entities/${entity}/fields/`);
-  }, [history, application, entity]);
+    history.push(`${baseUrl}/entities/${entity}/fields/`);
+  }, [history, entity, baseUrl]);
 
   const handleSubmit = useCallback(
     (data) => {
@@ -109,7 +119,7 @@ const EntityField = () => {
         }
       }
 
-      const { id, ...rest } = data; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const { id, permanentId, ...rest } = data;
       updateEntityField({
         variables: {
           where: {
@@ -127,7 +137,7 @@ const EntityField = () => {
       if (!lookupPendingData) {
         throw new Error("lookupPendingData must be defined");
       }
-      const { id, ...rest } = lookupPendingData; // eslint-disable-line @typescript-eslint/no-unused-vars
+      const { id, permanentId, ...rest } = lookupPendingData;
       updateEntityField({
         variables: {
           where: {
@@ -170,26 +180,38 @@ const EntityField = () => {
     <div className={CLASS_NAME}>
       {!loading && (
         <>
-          <div className={`${CLASS_NAME}__header`}>
-            <h3>Field Settings</h3>
-            {entity && entityField && (
-              <DeleteEntityField
-                entityId={entity}
-                entityField={entityField}
-                showLabel
-                onDelete={handleDeleteField}
-                onError={setError}
-              />
-            )}
-          </div>
+          <Text
+            textColor={EnumTextColor.Primary}
+          >{`${entityRecord.name} entity`}</Text>
+          <FlexItem
+            itemsAlign={EnumItemsAlign.Start}
+            start={<TabContentTitle title="Field Settings" />}
+            end={
+              entity &&
+              entityField && (
+                <DeleteEntityField
+                  entityId={entity}
+                  entityField={entityField}
+                  showLabel
+                  onDelete={handleDeleteField}
+                  onError={setError}
+                />
+              )
+            }
+          ></FlexItem>
+
           <EntityFieldForm
-            isDisabled={
+            isSystemDataType={
               defaultValues && SYSTEM_DATA_TYPES.has(defaultValues.dataType)
+            }
+            isAuthEntitySpecificDataType={
+              defaultValues &&
+              AUTHENTICATION_ENTITY_DATA_TYPES.has(defaultValues.dataType)
             }
             onSubmit={handleSubmit}
             defaultValues={defaultValues}
-            applicationId={application}
-            entityDisplayName={entityDisplayName || ""}
+            resourceId={resource}
+            entity={entityRecord}
           />
         </>
       )}
@@ -197,7 +219,7 @@ const EntityField = () => {
         <RelatedFieldDialog
           isOpen={lookupPendingData !== null}
           onDismiss={hideRelatedFieldDialog}
-          onSubmit={handleRelatedFieldFormSubmit}
+          onSubmit={handleRelatedFieldFormSubmit as any} // TODO: address after Nx React migration
           relatedEntityId={lookupPendingData?.properties?.relatedEntityId}
           allowMultipleSelection={
             !lookupPendingData?.properties?.allowMultipleSelection
@@ -219,6 +241,7 @@ const GET_ENTITY_FIELD = gql`
       name
       displayName
       pluralDisplayName
+      customAttributes
       fields(where: { id: { equals: $field } }) {
         id
         createdAt
@@ -230,7 +253,9 @@ const GET_ENTITY_FIELD = gql`
         required
         unique
         searchable
+        customAttributes
         description
+        permanentId
       }
     }
   }
@@ -259,6 +284,7 @@ const UPDATE_ENTITY_FIELD = gql`
       required
       unique
       searchable
+      customAttributes
       description
     }
   }

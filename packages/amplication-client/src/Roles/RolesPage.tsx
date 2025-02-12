@@ -1,40 +1,17 @@
 import React from "react";
-import { match, useRouteMatch } from "react-router-dom";
-import { isEmpty } from "lodash";
-
-import PageContent from "../Layout/PageContent";
+import { match } from "react-router-dom";
+import { AppRouteProps } from "../routes/routesUtil";
 import { RoleList } from "./RoleList";
-import Role from "./Role";
-import useNavigationTabs from "../Layout/UseNavigationTabs";
 
-type Props = {
-  match: match<{ application: string }>;
+type Props = AppRouteProps & {
+  match: match<{
+    resource: string;
+  }>;
 };
-const NAVIGATION_KEY = "ROLE";
 
-const RolesPage = ({ match }: Props) => {
-  const { application } = match.params;
-
-  useNavigationTabs(application, NAVIGATION_KEY, match.url, "Roles");
-
-  const roleMatch = useRouteMatch<{ roleId: string }>(
-    "/:application/roles/:roleId"
-  );
-
-  let roleId = null;
-  if (roleMatch) {
-    roleId = roleMatch.params.roleId;
-  }
-
+const RolesPage: React.FC<Props> = ({ match, innerRoutes }: Props) => {
   return (
-    <PageContent
-      className="roles"
-      sideContent={
-        <RoleList applicationId={application} selectFirst={null === roleId} />
-      }
-    >
-      {!isEmpty(roleId) && <Role />}
-    </PageContent>
+    <div className="roles">{match.isExact ? <RoleList /> : innerRoutes}</div>
   );
 };
 

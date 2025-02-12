@@ -4,9 +4,9 @@ import {
   Panel,
   Snackbar,
   CircularProgress,
-} from "@amplication/design-system";
+} from "@amplication/ui/design-system";
 import { gql, useQuery } from "@apollo/client";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Button, EnumButtonStyle } from "../Components/Button";
 import * as models from "../models";
 import { formatError } from "../util/error";
@@ -20,7 +20,7 @@ type TData = {
 
 const CLASS_NAME = "api-token-list";
 
-export const ApiTokenList = React.memo(() => {
+const ApiTokenList = React.memo(() => {
   const [newTokenState, setNewTokenState] = useState<boolean>(false);
   const [newToken, setNewToken] = useState<models.ApiToken | null>(null);
   const [error, setError] = useState<Error>();
@@ -47,14 +47,24 @@ export const ApiTokenList = React.memo(() => {
     }
     await navigator.clipboard.writeText(token);
     setTokenCopied(true);
-  }
+  };
 
-  const { data, loading, error: errorLoading } = useQuery<TData>(
-    GET_API_TOKENS
-  );
+  const {
+    data,
+    loading,
+    error: errorLoading,
+  } = useQuery<TData>(GET_API_TOKENS, {
+    fetchPolicy: "network-only",
+  });
 
   const errorMessage =
     formatError(errorLoading) || (error && formatError(error));
+
+  //clear token on re-entry
+  useEffect(() => {
+    setNewToken(null);
+    setTokenCopied(false);
+  }, []);
 
   return (
     <>
@@ -67,22 +77,25 @@ export const ApiTokenList = React.memo(() => {
         <NewApiToken onCompleted={handleNewTokenCompleted} />
       </Dialog>
       <div className={`${CLASS_NAME}__header`}>
-        <h2>API Tokens</h2>
+        <h3>API Tokens</h3>
         <Button
           className={`${CLASS_NAME}__add-button`}
           buttonStyle={EnumButtonStyle.Primary}
           onClick={handleNewTokenClick}
-          icon="plus"
         >
           Create API Token
         </Button>
       </div>
       <div className={`${CLASS_NAME}__message`}>
-        API tokens are used to authenticate requests to Amplication API,
-        specifically it is required to use Amplication CLI.
+        API tokens are used to authenticate requests to the Amplication API.
+        They are specifically required for Integrations from third party
+        services.
         <br />
-        Tokens are valid for 30 days from creation or last use, so that the 30
-        day expiration automatically refreshes with each API call.
+        Tokens are valid for 30 days following creation or last use. The 30 day
+        expiration period automatically refreshes with each API.
+        <br />
+        Tokens are created with the permissions of the user who creates them,
+        and each user can only see their own tokens.
       </div>
 
       {newToken && (
@@ -91,12 +104,15 @@ export const ApiTokenList = React.memo(() => {
           panelStyle={EnumPanelStyle.Bordered}
         >
           <div className={`${CLASS_NAME}__new-token-message`}>
-            Make sure to copy your new API token now. You won't be able to see it
-            again.<br />
+            Make sure to copy your new API token now. You won't be able to see
+            it again.
+            <br />
           </div>
           <Button
             className={`${CLASS_NAME}__add-button`}
-            buttonStyle={!tokenCopied ? EnumButtonStyle.Primary : EnumButtonStyle.Clear}
+            buttonStyle={
+              !tokenCopied ? EnumButtonStyle.Primary : EnumButtonStyle.Text
+            }
             onClick={handleCopyToken}
             icon={!tokenCopied ? "copy" : "check"}
             disabled={tokenCopied}
@@ -106,11 +122,11 @@ export const ApiTokenList = React.memo(() => {
         </Panel>
       )}
 
-      {loading && <CircularProgress />}
+      {loading && <CircularProgress centerToParent />}
       {data?.userApiTokens.map((token) => (
         <ApiTokenListItem
           key={token.id}
-          applicationId={"data?.entity.appId"}
+          resourceId={"data?.entity.resourceId"}
           apiToken={token}
           onError={setError}
         />
@@ -119,6 +135,8 @@ export const ApiTokenList = React.memo(() => {
     </>
   );
 });
+
+export default ApiTokenList;
 
 export const GET_API_TOKENS = gql`
   query userApiTokens {

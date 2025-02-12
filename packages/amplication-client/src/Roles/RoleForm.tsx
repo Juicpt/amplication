@@ -1,18 +1,20 @@
-import React, { useMemo } from "react";
+import { Form, TextField } from "@amplication/ui/design-system";
 import { Formik } from "formik";
-import { Form } from "../Components/Form";
-import omit from "lodash.omit";
-import * as models from "../models";
+import { omit } from "lodash";
+import { useMemo } from "react";
 import { DisplayNameField } from "../Components/DisplayNameField";
-import NameField from "../Components/NameField";
-import { TextField } from "@amplication/design-system";
-import { validate } from "../util/formikValidateJsonSchema";
+import * as models from "../models";
+import {
+  validate,
+  validationErrorMessages,
+} from "../util/formikValidateJsonSchema";
 
 import FormikAutoSave from "../util/formikAutoSave";
 
 type Props = {
-  onSubmit: (values: models.AppRole) => void;
-  defaultValues?: models.AppRole;
+  onSubmit: (values: models.Role) => void;
+  defaultValues?: models.Role;
+  disabled: boolean;
 };
 
 const NON_INPUT_GRAPHQL_PROPERTIES = [
@@ -20,29 +22,38 @@ const NON_INPUT_GRAPHQL_PROPERTIES = [
   "createdAt",
   "updatedAt",
   "__typename",
+  "permissions",
 ];
 
-export const INITIAL_VALUES: Partial<models.AppRole> = {
+export const INITIAL_VALUES: Partial<models.Role> = {
   name: "",
-  displayName: "",
+  key: "",
   description: "",
 };
 
+const { AT_LEAST_TWO_CHARACTERS } = validationErrorMessages;
+
 const FORM_SCHEMA = {
-  required: ["displayName", "name"],
+  required: ["name", "key"],
   properties: {
-    displayName: {
-      type: "string",
-      minLength: 2,
-    },
     name: {
       type: "string",
       minLength: 2,
     },
+    key: {
+      type: "string",
+      minLength: 2,
+    },
+  },
+  errorMessage: {
+    properties: {
+      name: AT_LEAST_TWO_CHARACTERS,
+      key: AT_LEAST_TWO_CHARACTERS,
+    },
   },
 };
 
-const RoleForm = ({ onSubmit, defaultValues }: Props) => {
+const RoleForm = ({ onSubmit, defaultValues, disabled }: Props) => {
   const initialValues = useMemo(() => {
     const sanitizedDefaultValues = omit(
       defaultValues,
@@ -51,30 +62,43 @@ const RoleForm = ({ onSubmit, defaultValues }: Props) => {
     return {
       ...INITIAL_VALUES,
       ...sanitizedDefaultValues,
-    } as models.AppRole;
+    } as models.Role;
   }, [defaultValues]);
 
   return (
-    <Formik
-      initialValues={initialValues}
-      validate={(values: models.AppRole) => validate(values, FORM_SCHEMA)}
-      enableReinitialize
-      onSubmit={onSubmit}
-    >
-      <Form childrenAsBlocks>
-        <FormikAutoSave debounceMS={1000} />
+    <>
+      <Formik
+        initialValues={initialValues}
+        validate={(values: models.Role) => validate(values, FORM_SCHEMA)}
+        enableReinitialize
+        onSubmit={onSubmit}
+      >
+        <Form childrenAsBlocks>
+          {!disabled && <FormikAutoSave debounceMS={1000} />}
 
-        <NameField name="name" />
+          <DisplayNameField
+            name="name"
+            label="Name"
+            minLength={1}
+            disabled={disabled}
+          />
+          <DisplayNameField
+            name="key"
+            label="Key"
+            minLength={1}
+            disabled={disabled}
+          />
 
-        <DisplayNameField
-          name="displayName"
-          label="Display Name"
-          minLength={1}
-        />
-
-        <TextField name="description" label="Description" textarea rows={3} />
-      </Form>
-    </Formik>
+          <TextField
+            name="description"
+            label="Description"
+            textarea
+            rows={3}
+            disabled={disabled}
+          />
+        </Form>
+      </Formik>
+    </>
   );
 };
 

@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useContext } from "react";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { isEmpty, cloneDeep } from "lodash";
-import difference from "@extra-set/difference";
 
 import "./EntityPermissionAction.scss";
 import * as models from "../models";
@@ -11,20 +10,26 @@ import {
   PanelCollapsible,
   Toggle,
   Icon,
-} from "@amplication/design-system";
+  FlexItem,
+  EnumFlexDirection,
+  EnumGapSize,
+  Text,
+  EnumTextStyle,
+  EnumItemsAlign,
+} from "@amplication/ui/design-system";
 import { ActionRoleList } from "./ActionRoleList";
 import { EntityPermissionFields } from "./EntityPermissionFields";
 import { GET_ENTITY_PERMISSIONS } from "./PermissionsForm";
-import { GET_ROLES } from "../Roles/RoleList";
-
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
+import { GET_ROLES } from "../ResourceRoles/RoleList";
+import { AppContext } from "../context/appContext";
 
 const CLASS_NAME = "entity-permissions-action";
 type TData = {
-  appRoles: models.AppRole[];
+  resourceRoles: models.ResourceRole[];
 };
 
 const OPTIONS = [
+  { value: models.EnumEntityPermissionType.Public, label: "Public" },
   { value: models.EnumEntityPermissionType.AllRoles, label: "All Roles" },
   { value: models.EnumEntityPermissionType.Granular, label: "Granular" },
 ];
@@ -34,7 +39,7 @@ type Props = {
   permission: models.EntityPermission;
   permissionAction: permissionTypes.PermissionAction;
   entityDisplayName: string;
-  applicationId: string;
+  resourceId: string;
 };
 
 export const EntityPermissionAction = ({
@@ -42,25 +47,27 @@ export const EntityPermissionAction = ({
   permission,
   permissionAction: { action: actionName, actionDisplayName, canSetFields },
   entityDisplayName,
-  applicationId,
+  resourceId,
 }: Props) => {
-  const pendingChangesContext = useContext(PendingChangesContext);
+  const { addEntity } = useContext(AppContext);
 
   const selectedRoleIds = useMemo((): Set<string> => {
-    return new Set(permission.permissionRoles?.map((role) => role.appRoleId));
+    return new Set(
+      permission.permissionRoles?.map((role) => role.resourceRoleId)
+    );
   }, [permission.permissionRoles]);
 
   /**@todo: handle  errors */
   const [updatePermission] = useMutation(UPDATE_PERMISSION, {
     onCompleted: (data) => {
-      pendingChangesContext.addEntity(entityId);
+      addEntity(entityId);
     },
   });
 
   /**@todo: handle  errors */
   const [updateRole] = useMutation(UPDATE_ROLES, {
     onCompleted: (data) => {
-      pendingChangesContext.addEntity(entityId);
+      addEntity(entityId);
     },
     update(cache, { data: { updateEntityPermissionRoles } }) {
       const queryData = cache.readQuery<{
@@ -93,8 +100,12 @@ export const EntityPermissionAction = ({
 
   const handleRoleSelectionChange = useCallback(
     (newSelectedRoleIds: Set<string>) => {
-      const addedRoleIds = difference(newSelectedRoleIds, selectedRoleIds);
-      const removedRoleIds = difference(selectedRoleIds, newSelectedRoleIds);
+      const addedRoleIds = new Set(
+        [...newSelectedRoleIds].filter((x) => !selectedRoleIds.has(x))
+      );
+      const removedRoleIds = new Set(
+        [...selectedRoleIds].filter((x) => !newSelectedRoleIds.has(x))
+      );
 
       const addRoles = Array.from(addedRoleIds, (id) => ({
         id,
@@ -119,7 +130,7 @@ export const EntityPermissionAction = ({
   /**@todo: handle loading state and errors */
   const { data } = useQuery<TData>(GET_ROLES, {
     variables: {
-      id: applicationId,
+      id: resourceId,
       orderBy: undefined,
       whereName: undefined,
     },
@@ -202,8 +213,9 @@ export const EntityPermissionAction = ({
       manualCollapseDisabled
       className={CLASS_NAME}
       headerContent={
-        <div className={`${CLASS_NAME}__header`}>
-          <div>
+        <FlexItem
+          itemsAlign={EnumItemsAlign.Center}
+          start={
             <Toggle
               title="enable action"
               onValueChange={handleDisableChange}
@@ -211,33 +223,45 @@ export const EntityPermissionAction = ({
                 permission.type !== models.EnumEntityPermissionType.Disabled
               }
             />
-          </div>
-          <div className={`${CLASS_NAME}__header__title`}>
-            <h3>
-              <span className={`${CLASS_NAME}__action-name`}>
-                {actionDisplayName}
-              </span>{" "}
-              {entityDisplayName}
-            </h3>
-            <h4>
-              <Icon icon="lock" />
-              {permission.type === models.EnumEntityPermissionType.AllRoles ? (
-                <span className={`${CLASS_NAME}__action-summary`}>
-                  All roles selected
-                </span>
-              ) : permission.type ===
-                models.EnumEntityPermissionType.Granular ? (
-                <span className={`${CLASS_NAME}__action-summary`}>
-                  {selectedRoleIds.size} roles selected
-                </span>
-              ) : (
-                <span className={`${CLASS_NAME}__action-summary--muted`}>
-                  This action is disabled
-                </span>
-              )}
-            </h4>
-          </div>
-          <div>
+          }
+        >
+          <FlexItem
+            direction={EnumFlexDirection.Column}
+            gap={EnumGapSize.Small}
+          >
+            <Text textStyle={EnumTextStyle.H4}>
+              {`${actionDisplayName} ${entityDisplayName}`}
+            </Text>
+            <Text textStyle={EnumTextStyle.Subtle}>
+              <FlexItem
+                itemsAlign={EnumItemsAlign.Center}
+                gap={EnumGapSize.Small}
+              >
+                <Icon icon="lock" />
+                {permission.type ===
+                models.EnumEntityPermissionType.AllRoles ? (
+                  <span className={`${CLASS_NAME}__action-summary`}>
+                    All roles selected
+                  </span>
+                ) : permission.type ===
+                  models.EnumEntityPermissionType.Granular ? (
+                  <span className={`${CLASS_NAME}__action-summary`}>
+                    {selectedRoleIds.size} roles selected
+                  </span>
+                ) : permission.type ===
+                  models.EnumEntityPermissionType.Public ? (
+                  <span className={`${CLASS_NAME}__action-summary`}>
+                    This action is public
+                  </span>
+                ) : (
+                  <span className={`${CLASS_NAME}__action-summary--muted`}>
+                    This action is disabled
+                  </span>
+                )}
+              </FlexItem>
+            </Text>
+          </FlexItem>
+          <FlexItem.FlexEnd minWidthAuto={true}>
             {permission.type !== models.EnumEntityPermissionType.Disabled && (
               <MultiStateToggle
                 label=""
@@ -247,14 +271,14 @@ export const EntityPermissionAction = ({
                 selectedValue={permission.type}
               />
             )}
-          </div>
-        </div>
+          </FlexItem.FlexEnd>
+        </FlexItem>
       }
     >
       <ul className="panel-list">
         <li>
           <ActionRoleList
-            availableRoles={data?.appRoles || []}
+            availableRoles={data?.resourceRoles || []}
             selectedRoleIds={selectedRoleIds}
             debounceMS={1000}
             onChange={handleRoleSelectionChange}
@@ -309,8 +333,8 @@ const UPDATE_ROLES = gql`
       type
       permissionRoles {
         id
-        appRoleId
-        appRole {
+        resourceRoleId
+        resourceRole {
           id
           displayName
         }

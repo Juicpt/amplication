@@ -1,47 +1,61 @@
-import React, { useState, useCallback, useEffect, useContext } from "react";
-import { gql, useQuery } from "@apollo/client";
+import {
+  CircularProgress,
+  EnumFlexDirection,
+  EnumFlexItemMargin,
+  EnumGapSize,
+  EnumItemsAlign,
+  EnumTextColor,
+  EnumTextStyle,
+  FlexItem,
+  Snackbar,
+  Text,
+  Tooltip,
+} from "@amplication/ui/design-system";
 import { isEmpty } from "lodash";
-import { Link } from "react-router-dom";
-
-import { formatError } from "../util/error";
-import * as models from "../models";
-import PendingChange from "./PendingChange";
+import { useCallback, useContext, useState } from "react";
+import { Link, useHistory, useRouteMatch } from "react-router-dom";
 import { Button, EnumButtonStyle } from "../Components/Button";
-import { Dialog, Snackbar, Tooltip } from "@amplication/design-system";
-import Commit from "./Commit";
+import { formatError } from "../util/error";
+import Commit, { CommitBtnType } from "./Commit";
 import DiscardChanges from "./DiscardChanges";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
-import { SvgThemeImage, EnumImages } from "../Components/SvgThemeImage";
 
+import usePendingChanges from "../Workspaces/hooks/usePendingChanges";
+import { AppContext } from "../context/appContext";
 import "./PendingChanges.scss";
+import PendingChangesList from "./PendingChangesList";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
+import { useProjectBaseUrl } from "../util/useProjectBaseUrl";
+import { EnumResourceTypeGroup } from "../models";
 
 const CLASS_NAME = "pending-changes";
 
-type TData = {
-  pendingChanges: models.PendingChange[];
-};
-
 type Props = {
-  applicationId: string;
+  projectId: string;
 };
 
-const PendingChanges = ({ applicationId }: Props) => {
+const PendingChanges = ({ projectId }: Props) => {
   const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
-  const pendingChangesContext = useContext(PendingChangesContext);
+  const history = useHistory();
+  const { currentProject, pendingChanges } = useContext(AppContext);
+  const { baseUrl } = useResourceBaseUrl();
+  const { baseUrl: projectBaseUrl, isPlatformConsole } = useProjectBaseUrl();
 
-  const { data, loading, error, refetch } = useQuery<TData>(
-    GET_PENDING_CHANGES,
-    {
-      variables: {
-        applicationId,
-      },
-    }
-  );
+  const resourceTypeGroup = isPlatformConsole
+    ? EnumResourceTypeGroup.Platform
+    : EnumResourceTypeGroup.Services;
 
-  //refetch when pending changes object change
-  useEffect(() => {
-    refetch().catch(console.error);
-  }, [refetch, pendingChangesContext.pendingChanges]);
+  const entityMatch = useRouteMatch<{
+    workspace: string;
+    project: string;
+    resource: string;
+    entity: string;
+  }>("/:workspace/:project/:resource/entities/:entity");
+
+  const {
+    pendingChangesDataError,
+    pendingChangesIsError,
+    pendingChangesDataLoading,
+  } = usePendingChanges(currentProject, resourceTypeGroup);
 
   const handleToggleDiscardDialog = useCallback(() => {
     setDiscardDialogOpen(!discardDialogOpen);
@@ -49,116 +63,92 @@ const PendingChanges = ({ applicationId }: Props) => {
 
   const handleDiscardDialogCompleted = useCallback(() => {
     setDiscardDialogOpen(false);
-  }, []);
+    if (entityMatch) {
+      history.push(`${baseUrl}/entities`);
+    }
+  }, [entityMatch, history, baseUrl]);
 
-  const errorMessage = formatError(error);
+  const errorMessage = formatError(pendingChangesDataError);
 
-  const noChanges = isEmpty(data?.pendingChanges);
+  const noChanges = isEmpty(pendingChanges);
 
   return (
     <div className={CLASS_NAME}>
-      <Commit applicationId={applicationId} noChanges={noChanges} />
-      <div className={`${CLASS_NAME}__changes-header`}>
-        <span>Changes</span>
-        <span
-          className={
-            data?.pendingChanges.length
-              ? `${CLASS_NAME}__changes-count-warning`
-              : `${CLASS_NAME}__changes-count`
-          }
+      {resourceTypeGroup === EnumResourceTypeGroup.Platform ? (
+        <Text
+          textStyle={EnumTextStyle.H4}
+          textColor={EnumTextColor.ThemeOrange}
         >
-          {data?.pendingChanges.length}
-        </span>
-        <div className="spacer" />
-        <Tooltip aria-label={"Compare Changes"} direction="sw">
-          <Link to={`/${applicationId}/pending-changes`}>
-            <Button
-              buttonStyle={EnumButtonStyle.Clear}
-              disabled={loading || noChanges}
-              icon="compare"
-            />
-          </Link>
-        </Tooltip>
-        <Tooltip aria-label={"Discard Pending Changes"} direction="sw">
-          <Button
-            buttonStyle={EnumButtonStyle.Clear}
-            onClick={handleToggleDiscardDialog}
-            disabled={loading || noChanges}
-            icon="trash_2"
-          />
-        </Tooltip>
-      </div>
-      {isEmpty(data?.pendingChanges) && !loading ? (
-        <div className={`${CLASS_NAME}__empty-state`}>
-          <SvgThemeImage image={EnumImages.NoChanges} />
-          <div className={`${CLASS_NAME}__empty-state__title`}>
-            No pending changes! keep working.
+          Platform Changes
+        </Text>
+      ) : (
+        <Text textStyle={EnumTextStyle.H4}>Pending changes</Text>
+      )}
+
+      <FlexItem
+        itemsAlign={EnumItemsAlign.Stretch}
+        direction={EnumFlexDirection.Column}
+        margin={EnumFlexItemMargin.Top}
+        gap={EnumGapSize.Small}
+      >
+        <Commit
+          projectId={projectId}
+          noChanges={noChanges}
+          commitBtnType={CommitBtnType.Button}
+          resourceTypeGroup={resourceTypeGroup}
+        />
+
+        <DiscardChanges
+          isOpen={discardDialogOpen}
+          projectId={projectId}
+          resourceTypeGroup={resourceTypeGroup}
+          onComplete={handleDiscardDialogCompleted}
+          onDismiss={handleToggleDiscardDialog}
+        />
+
+        <div className={`${CLASS_NAME}__changes-wrapper`}>
+          {pendingChangesDataLoading ? (
+            <CircularProgress centerToParent />
+          ) : (
+            <PendingChangesList resourceTypeGroup={resourceTypeGroup} />
+          )}
+          <hr className={`${CLASS_NAME}__divider`} />
+          <div className={`${CLASS_NAME}__changes-header`}>
+            <span>Changes</span>
+            <span
+              className={
+                pendingChanges.length
+                  ? `${CLASS_NAME}__changes-count-warning`
+                  : `${CLASS_NAME}__changes-count`
+              }
+            >
+              {pendingChanges.length}
+            </span>
+            <div className="spacer" />
+            <Tooltip aria-label={"Compare Changes"} direction="nw">
+              <Link to={`${projectBaseUrl}/pending-changes`}>
+                <Button
+                  buttonStyle={EnumButtonStyle.Text}
+                  disabled={pendingChangesDataLoading || noChanges}
+                  icon="compare"
+                />
+              </Link>
+            </Tooltip>
+            <Tooltip aria-label={"Discard Pending Changes"} direction="nw">
+              <Button
+                buttonStyle={EnumButtonStyle.Text}
+                onClick={handleToggleDiscardDialog}
+                disabled={pendingChangesDataLoading || noChanges}
+                icon="trash_2"
+              />
+            </Tooltip>
           </div>
         </div>
-      ) : (
-        <>
-          <Dialog
-            className="discard-dialog"
-            isOpen={discardDialogOpen}
-            onDismiss={handleToggleDiscardDialog}
-            title="Discard Changes"
-          >
-            <DiscardChanges
-              applicationId={applicationId}
-              onComplete={handleDiscardDialogCompleted}
-              onCancel={handleToggleDiscardDialog}
-            />
-          </Dialog>
+      </FlexItem>
 
-          {loading ? (
-            <span>Loading...</span>
-          ) : (
-            <div className={`${CLASS_NAME}__changes`}>
-              {data?.pendingChanges.map((change) => (
-                <PendingChange
-                  key={change.resourceId}
-                  change={change}
-                  applicationId={applicationId}
-                  linkToResource
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-      <Snackbar open={Boolean(error)} message={errorMessage} />
+      <Snackbar open={Boolean(pendingChangesIsError)} message={errorMessage} />
     </div>
   );
 };
 
 export default PendingChanges;
-
-export const GET_PENDING_CHANGES = gql`
-  query pendingChanges($applicationId: String!) {
-    pendingChanges(where: { app: { id: $applicationId } }) {
-      resourceId
-      action
-      resourceType
-      versionNumber
-      resource {
-        __typename
-        ... on Entity {
-          id
-          displayName
-          updatedAt
-          lockedByUser {
-            account {
-              firstName
-              lastName
-            }
-          }
-        }
-        ... on Block {
-          id
-          displayName
-          updatedAt
-        }
-      }
-    }
-  }
-`;

@@ -1,63 +1,64 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { gql, useQuery, useMutation, useApolloClient } from "@apollo/client";
-import classNames from "classnames";
-import { useHistory } from "react-router-dom";
-import { Button, EnumButtonStyle } from "../Components/Button";
-import { setToken } from "../authentication/authentication";
 import {
-  CircleBadge,
-  Dialog,
   CircularProgress,
-} from "@amplication/design-system";
-import * as models from "../models";
-import WorkspaceSelectorList from "./WorkspaceSelectorList";
+  Dialog,
+  EnumItemsAlign,
+  EnumTextStyle,
+  FlexItem,
+  Text,
+} from "@amplication/ui/design-system";
+import classNames from "classnames";
+import { useCallback, useContext, useState } from "react";
+import { Button, EnumButtonStyle } from "../Components/Button";
+import { AppContext } from "../context/appContext";
+import { EnumSubscriptionPlan } from "../models";
 import NewWorkspace from "./NewWorkspace";
 import "./WorkspaceSelector.scss";
+import WorkspaceSelectorList from "./WorkspaceSelectorList";
+import { GET_WORKSPACES } from "./queries/workspaceQueries";
+import { useQuery } from "@apollo/client";
+import * as models from "../models";
+import { useStiggContext } from "@stigg/react-sdk";
+import { BillingFeature } from "@amplication/util-billing-types";
+
+export const FREE_WORKSPACE_COLOR = "#A787FF";
+export const PRO_WORKSPACE_COLOR = "#20a4f3";
+export const ENTERPRISE_WORKSPACE_COLOR = "#31c587";
+
+export const getWorkspaceColor = (plan: EnumSubscriptionPlan) => {
+  switch (plan) {
+    case EnumSubscriptionPlan.Free:
+      return FREE_WORKSPACE_COLOR;
+    case EnumSubscriptionPlan.Essential:
+    case EnumSubscriptionPlan.Pro:
+    case EnumSubscriptionPlan.Team:
+      return PRO_WORKSPACE_COLOR;
+    case EnumSubscriptionPlan.Enterprise:
+      return ENTERPRISE_WORKSPACE_COLOR;
+    default:
+      return FREE_WORKSPACE_COLOR;
+  }
+};
 
 type TData = {
-  currentWorkspace: models.Workspace;
+  workspaces: models.Workspace[];
 };
 
-type TSetData = {
-  setCurrentWorkspace: {
-    token: string;
-  };
-};
-
-export const COLOR = "#A787FF";
 const CLASS_NAME = "workspaces-selector";
 
 function WorkspaceSelector() {
+  const { currentWorkspace, handleSetCurrentWorkspace } =
+    useContext(AppContext);
+
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [newWorkspace, setNewWorkspace] = useState<boolean>(false);
 
-  const apolloClient = useApolloClient();
-  const history = useHistory();
+  const { data, loading } = useQuery<TData>(GET_WORKSPACES);
 
-  const [setCurrentWorkspace, { data: setCurrentData }] = useMutation<TSetData>(
-    SET_CURRENT_WORKSPACE
-  );
+  const { stigg } = useStiggContext();
 
-  const handleSetCurrentWorkspace = useCallback(
-    (workspace: models.Workspace) => {
-      setIsOpen(false);
-      setCurrentWorkspace({
-        variables: {
-          workspaceId: workspace.id,
-        },
-      }).catch(console.error);
-    },
-    [setCurrentWorkspace]
-  );
-
-  useEffect(() => {
-    if (setCurrentData) {
-      apolloClient.clearStore();
-      setToken(setCurrentData.setCurrentWorkspace.token);
-      history.replace("/");
-      window.location.reload();
-    }
-  }, [setCurrentData, history, apolloClient]);
+  const createWorkspaceEntitlement = stigg.getBooleanEntitlement({
+    featureId: BillingFeature.AllowWorkspaceCreation,
+  }).hasAccess;
 
   const handleNewWorkspaceClick = useCallback(() => {
     setNewWorkspace(!newWorkspace);
@@ -69,49 +70,51 @@ function WorkspaceSelector() {
     });
   }, [setIsOpen]);
 
-  const { data, loading } = useQuery<TData>(GET_CURRENT_WORKSPACE);
-
   return (
-    <div className={CLASS_NAME}>
+    <div className={`${CLASS_NAME}`}>
       <Dialog
         className="new-entity-dialog"
         isOpen={newWorkspace}
         onDismiss={handleNewWorkspaceClick}
         title="New Workspace"
       >
-        <NewWorkspace onWorkspaceCreated={handleSetCurrentWorkspace} />
+        <NewWorkspace />
       </Dialog>
       <div
         className={classNames(`${CLASS_NAME}__current`, {
           [`${CLASS_NAME}__current--active`]: isOpen,
         })}
-        onClick={handleOpen}
+        onClick={
+          createWorkspaceEntitlement || data?.workspaces?.length > 1
+            ? handleOpen
+            : () => {}
+        }
       >
-        {loading ? (
-          <CircularProgress />
-        ) : (
+        {currentWorkspace ? (
           <>
-            <CircleBadge
-              name={data?.currentWorkspace.name || ""}
-              color={COLOR}
-            />
-            <span className={`${CLASS_NAME}__current__name`}>
-              {data?.currentWorkspace.name}
-            </span>
-            <Button
-              buttonStyle={EnumButtonStyle.Clear}
-              disabled={loading}
-              type="button"
-              icon="code"
-            />
+            <FlexItem itemsAlign={EnumItemsAlign.Center}>
+              <Text textStyle={EnumTextStyle.H3}>{currentWorkspace.name}</Text>
+              {(createWorkspaceEntitlement || data?.workspaces?.length > 1) && (
+                <Button
+                  buttonStyle={EnumButtonStyle.Text}
+                  type="button"
+                  icon={isOpen ? "chevron_up" : "chevron_down"}
+                  iconSize="xsmall"
+                />
+              )}
+            </FlexItem>
           </>
+        ) : (
+          <CircularProgress centerToParent />
         )}
       </div>
-      {isOpen && data && (
+      {isOpen && currentWorkspace && (
         <WorkspaceSelectorList
           onNewWorkspaceClick={handleNewWorkspaceClick}
-          selectedWorkspace={data.currentWorkspace}
+          selectedWorkspace={currentWorkspace}
           onWorkspaceSelected={handleSetCurrentWorkspace}
+          workspaces={data.workspaces}
+          loadingWorkspaces={loading}
         />
       )}
     </div>
@@ -119,20 +122,3 @@ function WorkspaceSelector() {
 }
 
 export default WorkspaceSelector;
-
-export const GET_CURRENT_WORKSPACE = gql`
-  query getCurrentWorkspace {
-    currentWorkspace {
-      id
-      name
-    }
-  }
-`;
-
-const SET_CURRENT_WORKSPACE = gql`
-  mutation setCurrentWorkspace($workspaceId: String!) {
-    setCurrentWorkspace(data: { id: $workspaceId }) {
-      token
-    }
-  }
-`;

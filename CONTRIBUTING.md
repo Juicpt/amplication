@@ -42,6 +42,12 @@ If you don't feel ready to make a code contribution yet, no problem! You can als
 
 # <a name="submit-pr"></a> How do I make a code contribution?
 
+## Open to community
+
+You can check all the issues that are open for community contributions. Check [here](https://github.com/amplication/amplication/issues?q=is%3Aopen+is%3Aissue+label%3A%22open+to+community%22).
+
+## Good first issues
+
 Are you new to open source contribution? Wondering how contributions work in our project? Here's a quick rundown.
 
 Find an issue that you're interested in addressing, or a feature that you'd like to add.
@@ -51,33 +57,30 @@ You can use [this view](https://github.com/amplication/amplication/issues?q=is%3
 
 Fork the Amplication repository to your GitHub organization. This means that you'll have a copy of the repository under _your-GitHub-username/repository-name_.
 
+> :accessibility: Un-check "Copy the DEFAULT branch only"
+
 ## Step 2: Clone the repository to your local machine
 
-```
-git clone https://github.com/{your-GitHub-username}/amplication.git
+```sh
+git clone -b next https://github.com/{your-GitHub-username}/amplication.git
 
 ```
 
 ## Step 3: Prepare the development environment
 
-Set up and run the development environment on your local machine:
-
-**BEFORE** you run the following steps make sure:
-1. You have typescript installed locally on you machine ```npm install -g typescript```
-2. You are using node version: ^16.3.0 || ^14.0.0"
-3. You are using npm version: ^8.1.0 || ^7.3.0"
-
-```shell
-cd amplication
-npm install
-npm run setup:dev
-```
+Set up and run the development environment on your local machine following the [README](./README.md#Development)
 
 ## Step 4: Create a branch
+Create a new branch for your changes.
+In order to keep branch names uniform and easy-to-understand, please use the following conventions for branch naming.
+Generally speaking, it is a good idea to add a group/type prefix to a branch.
+Here is a list of good examples:
+- for docs change : `docs/{ISSUE_NUMBER}-{CUSTOM_NAME}` for e.g. docs/2233-update-contributing-docs
+- for new features : `feat/{ISSUE_NUMBER}-{CUSTOM_NAME}` for e.g. feat/1144-add-plugins
+- for bug fixes : `fix/{ISSUE_NUMBER}-{CUSTOM_NAME}` for e.g. fix/9878-fix-invite-wrong-url
+- for anything else: `chore/{ISSUE_NUMBER}-{CUSTOM_NAME}` for e.g. chore/111-update-ci-url
 
-Create a new branch for your fix.
-
-```jsx
+```sh
 git checkout -b branch-name-here
 ```
 
@@ -89,7 +92,7 @@ Update the code with your bug fix or new feature.
 
 Stage the changes that are ready to be committed:
 
-```jsx
+```sh
 git add .
 ```
 
@@ -97,7 +100,7 @@ git add .
 
 Commit the changes with a short message. (See below for more details on how we structure our commit messages)
 
-```jsx
+```sh
 git commit -m "<type>(<package>): <subject>"
 ```
 
@@ -105,7 +108,7 @@ git commit -m "<type>(<package>): <subject>"
 
 Push the changes to the remote repository using:
 
-```jsx
+```sh
 git push origin branch-name-here
 ```
 
@@ -113,8 +116,9 @@ git push origin branch-name-here
 
 In GitHub, do the following to submit a pull request to the upstream repository:
 
-1.  Give the pull request a title and a short description of the changes made. Include also the issue or bug number associated with your change. Explain the changes that you made, any issues you think exist with the pull request you made, and any questions you have for the maintainer.
-
+1.  Give the pull request a title and a short description of the changes made following the template. Include also the issue or bug number associated with your change. Explain the changes that you made, any issues you think exist with the pull request you made, and any questions you have for the maintainer.  <br/> ⚠️ **Make sure your pull request target the `next` branch.**
+ 
+  > Pull request title should be in the form of `<type>(<package>): <subject>` as per commit messages.
 Remember, it's okay if your pull request is not perfect (no pull request ever is). The reviewer will be able to help you fix any problems and improve it!
 
 2.  Wait for the pull request to be reviewed by a maintainer.
@@ -158,6 +162,6 @@ fix(server): missing entity on init
 
 Please note that this project is released with a Contributor Code of Conduct. By participating in this project you agree to abide by its terms.
 
-[Code of Conduct](https://github.com/amplication/amplication/blob/master/code_of_conduct.md)
+[Code of Conduct](https://github.com/amplication/amplication/blob/master/CODE_OF_CONDUCT.md)
 
 Our Code of Conduct means that you are responsible for treating everyone on the project with respect and courtesy.

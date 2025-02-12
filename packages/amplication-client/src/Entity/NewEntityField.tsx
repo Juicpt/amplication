@@ -1,14 +1,17 @@
-import React, { useCallback, useRef, useContext, useState } from "react";
-import { gql, useMutation, Reference } from "@apollo/client";
-import { Formik, Form } from "formik";
+import { Snackbar, TextField } from "@amplication/ui/design-system";
+import { gql, Reference, useMutation } from "@apollo/client";
 import classNames from "classnames";
-import { TextField, Snackbar } from "@amplication/design-system";
-import { formatError } from "../util/error";
-import * as models from "../models";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
-import { useTracking } from "../util/analytics";
+import { Form, Formik } from "formik";
+import { useCallback, useContext, useState } from "react";
 import { Button, EnumButtonStyle } from "../Components/Button";
+import { AppContext } from "../context/appContext";
+import * as models from "../models";
+import { formatError } from "../util/error";
 import "./NewEntityField.scss";
+import {
+  LicenseIndicatorContainer,
+  LicensedResourceType,
+} from "../Components/LicenseIndicatorContainer";
 
 type Props = {
   entity: models.Entity;
@@ -26,11 +29,7 @@ const INITIAL_VALUES = {
 const CLASS_NAME = "new-entity-field";
 
 const NewEntityField = ({ entity, onFieldAdd }: Props) => {
-  const { trackEvent } = useTracking();
-  const pendingChangesContext = useContext(PendingChangesContext);
-
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
+  const { addEntity } = useContext(AppContext);
   const [autoFocus, setAutoFocus] = useState<boolean>(false);
 
   const [createEntityField, { error, loading }] = useMutation<TData>(
@@ -72,12 +71,7 @@ const NewEntityField = ({ entity, onFieldAdd }: Props) => {
         });
       },
       onCompleted: (data) => {
-        pendingChangesContext.addEntity(entity.id);
-        trackEvent({
-          eventName: "createEntityField",
-          entityFieldName: data.createEntityFieldByDisplayName.displayName,
-          dataType: data.createEntityFieldByDisplayName.dataType,
-        });
+        addEntity(entity.id);
       },
       errorPolicy: "none",
     }
@@ -85,7 +79,7 @@ const NewEntityField = ({ entity, onFieldAdd }: Props) => {
 
   const handleSubmit = useCallback(
     (data, actions) => {
-      setAutoFocus(true);
+      setAutoFocus(false);
       createEntityField({
         variables: {
           data: {
@@ -99,11 +93,11 @@ const NewEntityField = ({ entity, onFieldAdd }: Props) => {
             onFieldAdd(result.data.createEntityFieldByDisplayName);
           }
           actions.resetForm();
-          inputRef.current?.focus();
+          setAutoFocus(true);
         })
         .catch(console.error);
     },
-    [createEntityField, entity.id, inputRef, onFieldAdd]
+    [createEntityField, entity.id, onFieldAdd]
   );
 
   const errorMessage = formatError(error);
@@ -122,21 +116,24 @@ const NewEntityField = ({ entity, onFieldAdd }: Props) => {
               name="displayName"
               label="New Field Name"
               disabled={loading}
-              inputRef={inputRef}
               placeholder="Add field"
               autoComplete="off"
               autoFocus={autoFocus}
               hideLabel
               className={`${CLASS_NAME}__add-field__text`}
             />
-            <Button
-              buttonStyle={EnumButtonStyle.Clear}
-              icon="plus"
-              className={classNames(`${CLASS_NAME}__add-field__button`, {
-                [`${CLASS_NAME}__add-field__button--show`]:
-                  formik.values.displayName.length > 0,
-              })}
-            />
+            <LicenseIndicatorContainer
+              licensedResourceType={LicensedResourceType.Service}
+            >
+              <Button
+                buttonStyle={EnumButtonStyle.Text}
+                icon="plus"
+                className={classNames(`${CLASS_NAME}__add-field__button`, {
+                  [`${CLASS_NAME}__add-field__button--show`]:
+                    formik.values.displayName.length > 0,
+                })}
+              />
+            </LicenseIndicatorContainer>
           </Form>
         )}
       </Formik>
@@ -159,6 +156,7 @@ const CREATE_ENTITY_FIELD = gql`
       required
       unique
       searchable
+      customAttributes
       description
       properties
     }
@@ -174,6 +172,7 @@ const NEW_ENTITY_FIELD_FRAGMENT = gql`
     required
     unique
     searchable
+    customAttributes
     description
     properties
   }

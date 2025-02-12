@@ -1,15 +1,54 @@
 @import "../style/index.scss";
 
 .last-commit {
-  @include flexFullRowWithSpacing;
-  height: var(--app-footer-height);
-  white-space: nowrap;
-  padding: 0 var(--default-spacing);
+  margin-top: auto;
+
+  &__title {
+    font-size: 14px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  &__status {
+    display: grid;
+    align-items: center;
+    margin: var(--large-spacing) 0;
+  }
+
+  .build-status-icons__status {
+    .amp-icon {
+      margin-left: 0;
+    }
+  }
+
+  &__divider {
+    border: none;
+    background-color: var(--gray-70);
+    height: 1px;
+    margin: 0;
+  }
+
+  &__skeleton {
+    padding: var(--large-spacing) 0;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    padding: var(--large-spacing);
+    max-height: 200px;
+    overflow-y: auto;
+    @include scrollbars($default-scroll-width, var(--gray-30), transparent);
+  }
 
   .clickable-id {
-    color: var(--black80);
+    @include regular-12;
+    color: var(--gray-20);
+    margin-right: var(--icon-spacing);
     a {
-      color: var(--black100);
+      color: var(--gray-base);
     }
   }
   .user-and-time {
@@ -25,6 +64,10 @@
   }
 
   &__message {
-    color: var(--black60);
+    color: var(--gray-30);
+  }
+
+  .amp-button.amp-button--outline {
+    width: 100%;
   }
 }

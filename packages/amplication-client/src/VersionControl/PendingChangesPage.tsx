@@ -1,162 +1,77 @@
-import React, { useState, useCallback } from "react";
-import { match } from "react-router-dom";
-import { gql, useQuery } from "@apollo/client";
-import * as models from "../models";
-
+import {
+  EnumFlexItemMargin,
+  FlexItem,
+  HorizontalRule,
+  Snackbar,
+} from "@amplication/ui/design-system";
+import { useContext } from "react";
+import ResourceCircleBadge from "../Components/ResourceCircleBadge";
+import { AppContext } from "../context/appContext";
 import PageContent from "../Layout/PageContent";
+import { EnumResourceTypeGroup } from "../models";
 import { formatError } from "../util/error";
-
-import useNavigationTabs from "../Layout/UseNavigationTabs";
-import PendingChangeWithCompare from "./PendingChangeWithCompare";
+import { useProjectBaseUrl } from "../util/useProjectBaseUrl";
+import usePendingChanges from "../Workspaces/hooks/usePendingChanges";
+import ResourceNameLink from "../Workspaces/ResourceNameLink";
 import { EnumCompareType } from "./PendingChangeDiffEntity";
-import { GET_PENDING_CHANGES } from "./PendingChanges";
-import { MultiStateToggle, Snackbar } from "@amplication/design-system";
-
 import "./PendingChangesPage.scss";
-
-type Props = {
-  match: match<{ application: string; commitId: string }>;
-};
-
-type TData = {
-  pendingChanges: models.PendingChange[];
-};
+import PendingChangeWithCompare from "./PendingChangeWithCompare";
+import ResourceTypeBadge from "../Components/ResourceTypeBadge";
 
 const CLASS_NAME = "pending-changes-page";
-const NAVIGATION_KEY = "PENDING_CHANGES";
-const SPLIT = "Split";
-const UNIFIED = "Unified";
 
-const OPTIONS = [
-  { value: UNIFIED, label: UNIFIED },
-  { value: SPLIT, label: SPLIT },
-];
+const PendingChangesPage = () => {
+  const pageTitle = "Pending Changes";
+  const { currentProject } = useContext(AppContext);
 
-const PendingChangesPage = ({ match }: Props) => {
-  const { application } = match.params;
-  const [splitView, setSplitView] = useState<boolean>(false);
+  const { isPlatformConsole } = useProjectBaseUrl();
 
-  useNavigationTabs(application, NAVIGATION_KEY, match.url, "Pending Changes");
-
-  const handleChangeType = useCallback(
-    (type: string) => {
-      setSplitView(type === SPLIT);
-    },
-    [setSplitView]
+  const {
+    pendingChangesByResource,
+    pendingChangesDataError,
+    pendingChangesIsError,
+  } = usePendingChanges(
+    currentProject,
+    isPlatformConsole
+      ? EnumResourceTypeGroup.Platform
+      : EnumResourceTypeGroup.Services
   );
-  const { data, error } = useQuery<TData>(GET_PENDING_CHANGES, {
-    variables: {
-      applicationId: application,
-    },
-  });
 
-  const errorMessage = formatError(error);
+  const errorMessage = formatError(pendingChangesDataError);
 
   return (
     <>
-      <PageContent className={CLASS_NAME}>
-        {!data ? (
-          "loading..."
-        ) : (
-          <div className={`${CLASS_NAME}__header`}>
-            <h1>Pending Changes</h1>
-            <MultiStateToggle
-              label=""
-              name="compareMode"
-              options={OPTIONS}
-              onChange={handleChangeType}
-              selectedValue={splitView ? SPLIT : UNIFIED}
-            />
-          </div>
-        )}
+      <PageContent
+        className={CLASS_NAME}
+        pageTitle={pageTitle}
+        contentTitle="Pending Changes"
+      >
         <div className={`${CLASS_NAME}__changes`}>
-          {data?.pendingChanges.map((change) => (
-            <PendingChangeWithCompare
-              key={change.resourceId}
-              change={change}
-              compareType={EnumCompareType.Pending}
-              splitView={splitView}
-            />
+          {pendingChangesByResource.map((resourceChanges) => (
+            <div key={resourceChanges.resource.id}>
+              <FlexItem margin={EnumFlexItemMargin.Both}>
+                <ResourceTypeBadge
+                  resource={resourceChanges.resource}
+                  size="small"
+                />
+                <ResourceNameLink resource={resourceChanges.resource} />
+              </FlexItem>
+              <HorizontalRule />
+              {resourceChanges.changes.map((change) => (
+                <PendingChangeWithCompare
+                  key={change.originId}
+                  change={change}
+                  compareType={EnumCompareType.Pending}
+                />
+              ))}
+            </div>
           ))}
+          <div />
         </div>
       </PageContent>
-      <Snackbar open={Boolean(error)} message={errorMessage} />
+      <Snackbar open={Boolean(pendingChangesIsError)} message={errorMessage} />
     </>
   );
 };
 
 export default PendingChangesPage;
-
-export const GET_COMMIT = gql`
-  query Commit($commitId: String!) {
-    commit(where: { id: $commitId }) {
-      id
-      message
-      createdAt
-      user {
-        id
-        account {
-          firstName
-          lastName
-        }
-      }
-      changes {
-        resourceId
-        action
-        resourceType
-        versionNumber
-        resource {
-          __typename
-          ... on Entity {
-            id
-            displayName
-            updatedAt
-          }
-          ... on Block {
-            id
-            displayName
-            updatedAt
-          }
-        }
-      }
-      builds(orderBy: { createdAt: Desc }, take: 1) {
-        id
-        createdAt
-        appId
-        version
-        message
-        createdAt
-        commitId
-        actionId
-        action {
-          id
-          createdAt
-          steps {
-            id
-            name
-            createdAt
-            message
-            status
-            completedAt
-            logs {
-              id
-              createdAt
-              message
-              meta
-              level
-            }
-          }
-        }
-        createdBy {
-          id
-          account {
-            firstName
-            lastName
-          }
-        }
-        status
-        archiveURI
-      }
-    }
-  }
-`;

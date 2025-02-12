@@ -1,18 +1,17 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { EnumEntityAction } from 'src/enums/EnumEntityAction';
+import { Field, InputType } from "@nestjs/graphql";
+import { EnumEntityAction } from "../../../enums/EnumEntityAction";
 
 @InputType({
   isAbstract: true,
-  description: undefined
 })
 export class EntityPermissionWhereUniqueInput {
   @Field(() => EnumEntityAction, {
-    nullable: false
+    nullable: false,
   })
   action!: keyof typeof EnumEntityAction;
 
   @Field(() => String, {
-    nullable: false
+    nullable: false,
   })
-  appRoleId!: string;
+  resourceRoleId!: string;
 }

@@ -1,22 +1,21 @@
-import { registerEnumType } from '@nestjs/graphql';
+import { registerEnumType } from "@nestjs/graphql";
 
 export enum EnumBlockType {
-  AppSettings = 'AppSettings',
-  Flow = 'Flow',
-  ConnectorRestApi = 'ConnectorRestApi',
-  ConnectorRestApiCall = 'ConnectorRestApiCall',
-  ConnectorSoapApi = 'ConnectorSoapApi',
-  ConnectorFile = 'ConnectorFile',
-  EntityApi = 'EntityApi',
-  EntityApiEndpoint = 'EntityApiEndpoint',
-  FlowApi = 'FlowApi',
-  Layout = 'Layout',
-  CanvasPage = 'CanvasPage',
-  EntityPage = 'EntityPage',
-  Document = 'Document'
+  ServiceSettings = "ServiceSettings",
+  ProjectConfigurationSettings = "ProjectConfigurationSettings",
+  Topic = "Topic",
+  ServiceTopics = "ServiceTopics",
+  PluginInstallation = "PluginInstallation",
+  PluginOrder = "PluginOrder",
+  Module = "Module",
+  ModuleAction = "ModuleAction",
+  ModuleDto = "ModuleDto",
+  Package = "Package",
+  PrivatePlugin = "PrivatePlugin",
+  CodeEngineVersion = "CodeEngineVersion",
+  Relation = "Relation",
+  ResourceSettings = "ResourceSettings",
+  ResourceTemplateVersion = "ResourceTemplateVersion",
 }
 
-registerEnumType(EnumBlockType, {
-  name: 'EnumBlockType',
-  description: undefined
-});
+registerEnumType(EnumBlockType, { name: "EnumBlockType" });

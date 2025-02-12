@@ -1,9 +1,9 @@
 import React, { useRef, useEffect } from "react";
 import { useFormikContext } from "formik";
 import { DATA_TYPE_TO_LABEL_AND_ICON, SYSTEM_DATA_TYPES } from "./constants";
-import { getSchemaForDataType } from "@amplication/data";
+import { getSchemaForDataType } from "@amplication/code-gen-types";
 import * as models from "../models";
-import { SelectField, SelectFieldProps } from "@amplication/design-system";
+import { SelectField, SelectFieldProps } from "@amplication/ui/design-system";
 
 export const DATA_TYPE_OPTIONS = Object.entries(DATA_TYPE_TO_LABEL_AND_ICON)
   .filter(
@@ -42,7 +42,7 @@ const DataTypeSelectField = (props: Props) => {
       const defaultValues = Object.fromEntries(
         Object.entries(schema.properties).map(([name, property]) => [
           name,
-          property.default,
+          (property as any).default, // TODO: refactor for type safety with JSON Schema
         ])
       );
 

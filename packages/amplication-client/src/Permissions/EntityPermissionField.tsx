@@ -1,14 +1,17 @@
 import React, { useCallback, useMemo, useContext } from "react";
 import { gql, useMutation } from "@apollo/client";
-import difference from "@extra-set/difference";
 import { cloneDeep } from "lodash";
 
 import * as models from "../models";
 import { Button, EnumButtonStyle } from "../Components/Button";
-import { Panel, EnumPanelStyle, PanelHeader } from "@amplication/design-system";
+import {
+  Panel,
+  EnumPanelStyle,
+  PanelHeader,
+} from "@amplication/ui/design-system";
 import { ActionRoleList } from "./ActionRoleList";
 import { GET_ENTITY_PERMISSIONS } from "./PermissionsForm";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
+import { AppContext } from "../context/appContext";
 
 const CLASS_NAME = "entity-permission-fields";
 
@@ -27,26 +30,25 @@ export const EntityPermissionField = ({
   permission,
   onDeleteField,
 }: Props) => {
-  const pendingChangesContext = useContext(PendingChangesContext);
-
-  const availableRoles = useMemo((): models.AppRole[] => {
+  const { addEntity } = useContext(AppContext);
+  const availableRoles = useMemo((): models.ResourceRole[] => {
     if (!permission.permissionRoles) {
       return [];
     }
 
-    return permission.permissionRoles.map((role) => role.appRole);
+    return permission.permissionRoles.map((role) => role.resourceRole);
   }, [permission]);
 
   const selectedRoleIds = useMemo((): Set<string> => {
     return new Set(
-      permissionField.permissionRoles?.map((item) => item.appRole.id)
+      permissionField.permissionRoles?.map((item) => item.resourceRole.id)
     );
   }, [permissionField.permissionRoles]);
 
   /**@todo: handle  errors */
   const [updateRole] = useMutation(UPDATE_ROLES, {
     onCompleted: (data) => {
-      pendingChangesContext.addEntity(entityId);
+      addEntity(entityId);
     },
     update(cache, { data: { updateEntityPermissionFieldRoles } }) {
       const queryData = cache.readQuery<{
@@ -96,12 +98,16 @@ export const EntityPermissionField = ({
 
   const handleRoleSelectionChange = useCallback(
     (newSelectedRoleIds: Set<string>) => {
-      const addedRoleIds = difference(newSelectedRoleIds, selectedRoleIds);
-      const removedRoleIds = difference(selectedRoleIds, newSelectedRoleIds);
+      const addedRoleIds = new Set(
+        [...newSelectedRoleIds].filter((x) => !selectedRoleIds.has(x))
+      );
+      const removedRoleIds = new Set(
+        [...selectedRoleIds].filter((x) => !newSelectedRoleIds.has(x))
+      );
 
       const addPermissionRoles = Array.from(addedRoleIds, (id) => {
         const permissionRole = permission.permissionRoles?.find(
-          (item) => item.appRoleId === id
+          (item) => item.resourceRoleId === id
         );
         return {
           id: permissionRole?.id,
@@ -110,7 +116,7 @@ export const EntityPermissionField = ({
 
       const deletePermissionRoles = Array.from(removedRoleIds, (id) => {
         const permissionRole = permission.permissionRoles?.find(
-          (item) => item.appRoleId === id
+          (item) => item.resourceRoleId === id
         );
         return {
           id: permissionRole?.id,
@@ -146,7 +152,7 @@ export const EntityPermissionField = ({
           {permissionField.field.name}
         </span>
         <Button
-          buttonStyle={EnumButtonStyle.Clear}
+          buttonStyle={EnumButtonStyle.Text}
           icon="trash_2"
           onClick={handleDeleteField}
         />
@@ -183,7 +189,7 @@ const UPDATE_ROLES = gql`
       }
       permissionRoles {
         id
-        appRole {
+        resourceRole {
           id
           displayName
         }

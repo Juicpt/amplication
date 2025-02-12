@@ -1,13 +1,10 @@
-import { Icon } from "@amplication/design-system";
+import { Form, Icon } from "@amplication/ui/design-system";
 import classNames from "classnames";
-import { Link } from "react-router-dom";
 import { Formik } from "formik";
 import { isEmpty } from "lodash";
-import React from "react";
-import { Button, EnumButtonStyle } from "../Components/Button";
-import { DisplayNameField } from "../Components/DisplayNameField";
-import { Form } from "../Components/Form";
+import { Link } from "react-router-dom";
 import * as models from "../models";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
 import "./EntityRelationFieldsChart.scss";
 
 export type FormValues = {
@@ -16,26 +13,24 @@ export type FormValues = {
 };
 
 type Props = {
-  applicationId: string;
+  resourceId: string;
   entityId: string;
   field: models.EntityField;
   entityName: string;
   relatedEntityName: string;
   relatedField: models.EntityField;
-  fixInPlace: boolean;
   onSubmit: (data: FormValues) => void;
 };
 
 const CLASS_NAME = "entity-relation-fields-chart";
 
 export const EntityRelationFieldsChart = ({
-  applicationId,
+  resourceId,
   entityId,
   field,
   entityName,
   relatedEntityName,
   relatedField,
-  fixInPlace,
   onSubmit,
 }: Props) => {
   const initialValues: FormValues = {
@@ -44,6 +39,8 @@ export const EntityRelationFieldsChart = ({
   };
 
   const relatedFieldIsMissing = isEmpty(field.properties.relatedFieldId);
+
+  const { baseUrl } = useResourceBaseUrl({ overrideResourceId: resourceId });
 
   return (
     <Formik
@@ -59,15 +56,13 @@ export const EntityRelationFieldsChart = ({
           key={field.id}
         >
           <div className={`${CLASS_NAME}__entity`}>
-            <Link to={`/${applicationId}/entities/${entityId}`}>
+            <Link to={`${baseUrl}/entities/${entityId}`}>
               <Icon icon="entity_outline" />
               {entityName}
             </Link>
           </div>
           <div className={`${CLASS_NAME}__field`}>
-            <Link
-              to={`/${applicationId}/entities/${entityId}/fields/${field.id}`}
-            >
+            <Link to={`${baseUrl}/entities/${entityId}`}>
               {field.displayName}
             </Link>
           </div>
@@ -92,7 +87,7 @@ export const EntityRelationFieldsChart = ({
           </div>
           <div className={`${CLASS_NAME}__entity`}>
             <Link
-              to={`/${applicationId}/entities/${field.properties.relatedEntityId}`}
+              to={`${baseUrl}/entities/${field.properties.relatedEntityId}`}
             >
               <Icon icon="entity_outline" />
               {relatedEntityName}
@@ -100,42 +95,20 @@ export const EntityRelationFieldsChart = ({
           </div>
           <div className={`${CLASS_NAME}__field ${CLASS_NAME}__field--target`}>
             {relatedFieldIsMissing ? (
-              fixInPlace ? (
-                <DisplayNameField
-                  className={`${CLASS_NAME}__field__textbox`}
-                  name="relatedFieldDisplayName"
-                  placeholder="Display name for the new field"
-                  required
-                />
-              ) : (
-                <Link
-                  className={`${CLASS_NAME}__field__textbox`}
-                  to={`/${applicationId}/fix-related-entities`}
-                >
-                  Fix it
-                </Link>
-              )
+              <Link
+                className={`${CLASS_NAME}__field__textbox`}
+                to={`${baseUrl}/fix-related-entities`}
+              >
+                Fix it
+              </Link>
             ) : (
               <Link
-                to={`/${applicationId}/entities/${field.properties.relatedEntityId}/fields/${relatedField?.id}`}
+                to={`${baseUrl}/entities/${field.properties.relatedEntityId}/fields/${relatedField?.id}`}
               >
                 {relatedField?.displayName}
               </Link>
             )}
           </div>
-          {fixInPlace && (
-            <Button
-              className={`${CLASS_NAME}__fix`}
-              buttonStyle={EnumButtonStyle.Secondary}
-              type="submit"
-              eventData={{
-                eventName: "fixRelatedEntity",
-                fieldId: field.id,
-              }}
-            >
-              Fix Relation
-            </Button>
-          )}
         </div>
       </Form>
     </Formik>

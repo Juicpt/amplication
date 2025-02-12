@@ -1,31 +1,37 @@
 import React, { useMemo } from "react";
 import { gql, useQuery } from "@apollo/client";
-import { SelectField, SelectFieldProps } from "@amplication/design-system";
+import { SelectField, SelectFieldProps } from "@amplication/ui/design-system";
 
 type TEntities = {
   entities: [
     {
       id: string;
       displayName: string;
+      name: string;
     }
   ];
 };
 
 type Props = Omit<SelectFieldProps, "options"> & {
-  applicationId: string;
+  resourceId: string;
+  isValueId: boolean;
 };
 
-const EntitySelectField = ({ applicationId, ...props }: Props) => {
-  const { data: entityList } = useQuery<TEntities>(GET_ENTITIES, {
-    variables: {
-      appId: applicationId,
-    },
-  });
+const EntitySelectField = ({ resourceId, isValueId, ...props }: Props) => {
+  const { data: entityList } = useQuery<TEntities>(
+    GET_ENTITIES_FOR_ENTITY_SELECT_FIELD,
+    {
+      variables: {
+        resourceId: resourceId,
+      },
+      fetchPolicy: "no-cache",
+    }
+  );
 
   const entityListOptions = useMemo(() => {
     return entityList
       ? entityList.entities.map((entity) => ({
-          value: entity.id,
+          value: isValueId ? entity.id : entity.name,
           label: entity.displayName,
         }))
       : [];
@@ -36,11 +42,12 @@ const EntitySelectField = ({ applicationId, ...props }: Props) => {
 
 export default EntitySelectField;
 
-export const GET_ENTITIES = gql`
-  query getEntities($appId: String!) {
-    entities(where: { app: { id: $appId } }) {
+export const GET_ENTITIES_FOR_ENTITY_SELECT_FIELD = gql`
+  query getEntities($resourceId: String!) {
+    entities(where: { resource: { id: $resourceId } }) {
       id
       displayName
+      name
     }
   }
 `;

@@ -1,14 +1,25 @@
-import React, { useCallback } from "react";
+import {
+  EnumFlexDirection,
+  EnumFlexItemMargin,
+  EnumTextColor,
+  EnumTextStyle,
+  FlexItem,
+  Icon,
+  ListItem,
+  Text,
+} from "@amplication/ui/design-system";
 import { isEmpty } from "lodash";
-import * as models from "../models";
-import { Panel, EnumPanelStyle, Icon } from "@amplication/design-system";
+import { useCallback } from "react";
 import { Link, useHistory } from "react-router-dom";
-import { DATA_TYPE_TO_LABEL_AND_ICON } from "./constants";
+import * as models from "../models";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
 import { DeleteEntityField } from "./DeleteEntityField";
 import "./EntityFieldListItem.scss";
+import { EntityFieldProperty } from "./EntityFieldProperty";
+import { DATA_TYPE_TO_LABEL_AND_ICON } from "./constants";
 
 type Props = {
-  applicationId: string;
+  resourceId: string;
   entity: models.Entity;
   entityField: models.EntityField;
   entityIdToName: Record<string, string> | null;
@@ -16,17 +27,16 @@ type Props = {
   onError: (error: Error) => void;
 };
 
-const CLASS_NAME = "entity-field-list-item";
-
 export const EntityFieldListItem = ({
   entityField,
   entity,
-  applicationId,
+  resourceId,
   entityIdToName,
   onDelete,
   onError,
 }: Props) => {
   const history = useHistory();
+  const { baseUrl } = useResourceBaseUrl({ overrideResourceId: resourceId });
 
   const handleNavigateToRelatedEntity = useCallback(
     (event) => {
@@ -34,92 +44,80 @@ export const EntityFieldListItem = ({
       event.preventDefault();
 
       history.push(
-        `/${applicationId}/entities/${entityField.properties.relatedEntityId}`
+        `${baseUrl}/entities/${entityField.properties.relatedEntityId}`
       );
     },
-    [history, applicationId, entityField]
+    [history, entityField, baseUrl]
   );
 
   const handleRowClick = useCallback(() => {
-    history.push(
-      `/${applicationId}/entities/${entity.id}/fields/${entityField.id}`
-    );
-  }, [history, applicationId, entityField, entity]);
+    history.push(`${baseUrl}/entities/${entity.id}/fields/${entityField.id}`);
+  }, [baseUrl, history, entityField, entity]);
 
-  const fieldUrl = `/${applicationId}/entities/${entity.id}/fields/${entityField.id}`;
+  const fieldUrl = `${baseUrl}/entities/${entity.id}/fields/${entityField.id}`;
 
   return (
-    <Panel
-      className={CLASS_NAME}
-      clickable
-      onClick={handleRowClick}
-      panelStyle={EnumPanelStyle.Bordered}
-    >
-      <div className={`${CLASS_NAME}__row`}>
-        <Link
-          className={`${CLASS_NAME}__title`}
-          title={entityField.displayName}
-          to={fieldUrl}
-        >
-          {entityField.displayName}
-        </Link>
-        <span className={`${CLASS_NAME}__description`}>{entityField.name}</span>
-        <span className="spacer" />
-        <DeleteEntityField
-          entityId={entity.id}
-          entityField={entityField}
-          onDelete={onDelete}
-          onError={onError}
-        />
-      </div>
-      {!isEmpty(entityField.description) && (
-        <div className={`${CLASS_NAME}__row`}>
-          <span className={`${CLASS_NAME}__description`}>
-            {entityField.description}
-          </span>
-        </div>
-      )}
-      <div className={`${CLASS_NAME}__row`}>
-        <span className={`${CLASS_NAME}__highlight`}>
-          <Icon
-            className="amp-data-grid-item__icon"
-            icon={DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].icon}
-            size="xsmall"
-          />
-          {entityField.dataType === models.EnumDataType.Lookup &&
-          entityIdToName ? (
-            <Link
-              title={DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].label}
-              to={`/${applicationId}/entities/${entityField.properties.relatedEntityId}`}
-              onClick={handleNavigateToRelatedEntity}
-            >
-              {entityIdToName[entityField.properties.relatedEntityId]}{" "}
-              <Icon icon="external_link" />
+    <ListItem onClick={handleRowClick}>
+      <FlexItem
+        start={
+          <FlexItem direction={EnumFlexDirection.Row}>
+            <Icon
+              className="amp-data-grid-item__icon"
+              icon={DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].icon}
+              size="xsmall"
+            />
+            <Link title={entityField.displayName} to={fieldUrl}>
+              <Text>{entityField.displayName}</Text>
             </Link>
-          ) : (
-            DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].label
-          )}
-        </span>
+            <Text textColor={EnumTextColor.ThemeTurquoise}>
+              {entityField.name}
+            </Text>
+          </FlexItem>
+        }
+        end={
+          <DeleteEntityField
+            entityId={entity.id}
+            entityField={entityField}
+            onDelete={onDelete}
+            onError={onError}
+          />
+        }
+      />
+
+      {!isEmpty(entityField.description) && (
+        <Text textStyle={EnumTextStyle.Description}>
+          {entityField.description}
+        </Text>
+      )}
+      <FlexItem
+        direction={EnumFlexDirection.Row}
+        margin={EnumFlexItemMargin.Top}
+      >
+        {entityField.dataType === models.EnumDataType.Lookup &&
+        entityIdToName ? (
+          <Link
+            title={DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].label}
+            to={`${baseUrl}/entities/${entityField.properties.relatedEntityId}`}
+            onClick={handleNavigateToRelatedEntity}
+          >
+            {entityIdToName[entityField.properties.relatedEntityId]}{" "}
+            <Icon icon="external_link" />
+          </Link>
+        ) : (
+          <Text textStyle={EnumTextStyle.Tag}>
+            {DATA_TYPE_TO_LABEL_AND_ICON[entityField.dataType].label}
+          </Text>
+        )}
         {entityField.required && (
-          <span className={`${CLASS_NAME}__property`}>
-            <Icon icon="check" />
-            Required
-          </span>
+          <EntityFieldProperty property="Required" icon="alert_triangle" />
         )}
         {entityField.unique && (
-          <span className={`${CLASS_NAME}__property`}>
-            <Icon icon="check" />
-            Unique
-          </span>
+          <EntityFieldProperty property="Unique" icon="star" />
         )}
         {entityField.searchable && (
-          <span className={`${CLASS_NAME}__property`}>
-            <Icon icon="check" />
-            Searchable
-          </span>
+          <EntityFieldProperty property="Searchable" icon="search" />
         )}
-        <span className="spacer" />
-      </div>
-    </Panel>
+      </FlexItem>
+    </ListItem>
   );
 };

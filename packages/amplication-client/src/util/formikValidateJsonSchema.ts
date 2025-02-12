@@ -1,5 +1,6 @@
-import { FormikErrors } from "formik";
 import Ajv from "ajv";
+import ajvErrors from "ajv-errors";
+import { FormikErrors } from "formik";
 import { set } from "lodash";
 
 /**
@@ -21,20 +22,49 @@ import { set } from "lodash";
  *      onSubmit={handleSubmit}
  *    >
  *  */
+
+export const validationErrorMessages = {
+  AT_LEAST_TWO_CHARACTERS: "Must be at least 2 characters long",
+  NO_SYMBOLS_ERROR: "Unsupported character",
+  AT_MOST_SIXTY_CHARACTERS: "Must be at most 60 characters long",
+};
+
 export function validate<T>(
   values: T,
-  validationSchema: object
+  validationSchema: { [key: string]: any }
 ): FormikErrors<T> {
   const errors: FormikErrors<T> = {};
 
   const ajv = new Ajv({ allErrors: true });
 
-  let isValid = ajv.validate(validationSchema, values);
+  ajv.addKeyword("isNotEmpty", {
+    type: "string",
+    validate: function (schema, data) {
+      return typeof data === "string" && data.trim() !== "";
+    },
+    errors: true,
+  });
+
+  ajvErrors(ajv);
+
+  const isValid = ajv.validate(validationSchema, values);
+
+  const { minimumValue, maximumValue } = values as unknown as {
+    minimumValue: number;
+    maximumValue: number;
+  };
+  if (minimumValue && minimumValue >= maximumValue) {
+    set(
+      errors,
+      "minimumValue",
+      "Minimum value can not be greater than, or equal to, the Maximum value"
+    );
+  }
 
   if (!isValid && ajv.errors) {
     for (const error of ajv.errors) {
-      //remove the first dot from dataPath
-      const fieldName = error.instancePath.substring(1).replaceAll("/", ".");
+      // remove the first dot from dataPath
+      const fieldName = error.dataPath.substring(1).replaceAll("/", ".");
       set(errors, fieldName, error.message);
     }
   }

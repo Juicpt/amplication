@@ -1,8 +1,13 @@
-import React from "react";
+import {
+  EnumTextAlign,
+  EnumTextStyle,
+  Panel,
+  Text,
+} from "@amplication/ui/design-system";
 import { isEmpty } from "lodash";
-import "./PageContent.scss";
-import { Panel } from "@amplication/design-system";
+import React from "react";
 import { ReactComponent as DiscordButton } from "../assets/images/discord-button.svg";
+import "./PageContent.scss";
 import "./WelcomePage.scss";
 
 const CLASS_NAME = "welcome-page";
@@ -33,41 +38,12 @@ function WelcomePage({
         {!isEmpty(message) && (
           <div className={`${CLASS_NAME}__source-title`}>{message}</div>
         )}
-        Amplication is currently in Beta however your generated apps are
-        production-ready. Every app generated using Amplication platform
-        contains popular, documented, secured, and supported production-ready
-        open-source components & packages. Read more about our stack{" "}
-        <a
-          href="https://docs.amplication.com/docs/getting-started"
-          target="docs"
-        >
-          here
-        </a>
-        .
-      </p>
-      <p>
-        amplication is an open-source project and you can send us{" "}
-        <a
-          target="github"
-          href="https://github.com/amplication/amplication/issues/new?assignees=&labels=type%3A%20feature%20request&template=feature_request.md&title="
-        >
-          {" "}
-          feature requests
-        </a>
-        ,{" "}
-        <a
-          target="github"
-          href="https://github.com/amplication/amplication/issues/new?assignees=&labels=type%3A%20bug&template=bug_report.md&title="
-        >
-          {" "}
-          bug reports
-        </a>
-        , and contribute through our{" "}
-        <a href="https://github.com/amplication/amplication" target="github">
-          {" "}
-          GitHub repository
-        </a>
-        .
+        Amplication helps you to build and maintain production-ready backend
+        services that are always aligned with your standards. <br />
+        Leverage Amplication’s live templates to embed your organization’s best
+        practices and standards, private plugins to add custom functionality,
+        and a comprehensive service catalog to ensure full visibility across all
+        services.
       </p>
     </div>
   );
@@ -89,7 +65,7 @@ function WelcomePage({
           </div>
         </div>
         <a
-          href="https://discord.gg/Z2CG3rUFnu"
+          href="https://amplication.com/discord"
           target="discord"
           className="discord-button"
         >
@@ -100,16 +76,32 @@ function WelcomePage({
         <Panel className={`${CLASS_NAME}__panel`} shadow>
           {children}
         </Panel>
-        <div className={`${CLASS_NAME}__form__open-source-message`}>
-          {openSourceMessage}
-          <a
-            href="https://discord.gg/Z2CG3rUFnu"
-            target="discord"
-            className="discord-button"
+        <Text
+          textStyle={EnumTextStyle.Description}
+          textAlign={EnumTextAlign.Center}
+        >
+          By signing up to Amplication, you agree to our <br />
+          <Text
+            textStyle={EnumTextStyle.Description}
+            textAlign={EnumTextAlign.Center}
+            underline
           >
-            <DiscordButton />
-          </a>
-        </div>
+            <a href="https://amplication.com/terms" target="terms">
+              terms of service
+            </a>{" "}
+          </Text>
+          and&nbsp;
+          <Text
+            textStyle={EnumTextStyle.Description}
+            textAlign={EnumTextAlign.Center}
+            underline
+          >
+            <a href="https://amplication.com/privacy-policy" target="privacy">
+              privacy policy
+            </a>
+          </Text>
+          .
+        </Text>
       </div>
     </div>
   );

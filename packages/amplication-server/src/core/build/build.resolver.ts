@@ -1,30 +1,21 @@
-import { UseGuards, UseFilters } from '@nestjs/common';
-import {
-  Args,
-  Mutation,
-  Resolver,
-  Query,
-  Parent,
-  ResolveField
-} from '@nestjs/graphql';
-import { GqlResolverExceptionsFilter } from 'src/filters/GqlResolverExceptions.filter';
-import { GqlAuthGuard } from 'src/guards/gql-auth.guard';
-import { Build } from './dto/Build';
-import { CreateBuildArgs } from './dto/CreateBuildArgs';
-import { FindOneBuildArgs } from './dto/FindOneBuildArgs';
-import { FindManyBuildArgs } from './dto/FindManyBuildArgs';
-import { BuildService } from './build.service';
-import { AuthorizeContext } from 'src/decorators/authorizeContext.decorator';
-import { AuthorizableResourceParameter } from 'src/enums/AuthorizableResourceParameter';
-import { InjectContextValue } from 'src/decorators/injectContextValue.decorator';
-import { InjectableResourceParameter } from 'src/enums/InjectableResourceParameter';
-import { User } from 'src/models';
-import { UserService } from '../user/user.service';
-import { Action } from '../action/dto/Action';
-import { Deployment } from '../deployment/dto/Deployment';
-import { ActionService } from '../action/action.service';
-import { EnumBuildStatus } from './dto/EnumBuildStatus';
-import { FindManyDeploymentArgs } from '../deployment/dto/FindManyDeploymentArgs';
+import { UseFilters, UseGuards } from "@nestjs/common";
+import { Args, Parent, Query, ResolveField, Resolver } from "@nestjs/graphql";
+import { AuthorizeContext } from "../../decorators/authorizeContext.decorator";
+import { AuthorizableOriginParameter } from "../../enums/AuthorizableOriginParameter";
+import { GqlResolverExceptionsFilter } from "../../filters/GqlResolverExceptions.filter";
+import { GqlAuthGuard } from "../../guards/gql-auth.guard";
+import { Commit, Resource, User } from "../../models";
+import { ActionService } from "../action/action.service";
+import { Action } from "../action/dto";
+import { CommitService } from "../commit/commit.service";
+import { ResourceService } from "../resource/resource.service";
+import { UserService } from "../user/user.service";
+import { BuildService } from "./build.service";
+import { Build } from "./dto/Build";
+import { FindManyBuildArgs } from "./dto/FindManyBuildArgs";
+import { FindOneBuildArgs } from "./dto/FindOneBuildArgs";
+import { EnumBuildStatus } from "./dto/EnumBuildStatus";
+import { BuildPlugin } from "./dto/BuildPlugin";
 
 @Resolver(() => Build)
 @UseFilters(GqlResolverExceptionsFilter)
@@ -33,29 +24,50 @@ export class BuildResolver {
   constructor(
     private readonly service: BuildService,
     private readonly userService: UserService,
-    private readonly actionService: ActionService
+    private readonly actionService: ActionService,
+    private readonly commitService: CommitService,
+    private readonly resourceService: ResourceService
   ) {}
 
   @Query(() => [Build])
-  @AuthorizeContext(AuthorizableResourceParameter.AppId, 'where.app.id')
+  @AuthorizeContext(AuthorizableOriginParameter.ResourceId, "where.resource.id")
   async builds(@Args() args: FindManyBuildArgs): Promise<Build[]> {
     return this.service.findMany(args);
   }
 
   @Query(() => Build)
-  @AuthorizeContext(AuthorizableResourceParameter.BuildId, 'where.id')
+  @AuthorizeContext(AuthorizableOriginParameter.BuildId, "where.id")
   async build(@Args() args: FindOneBuildArgs): Promise<Build> {
     return this.service.findOne(args);
   }
 
   @ResolveField()
   async createdBy(@Parent() build: Build): Promise<User> {
-    return this.userService.findUser({ where: { id: build.userId } });
+    if (!build.createdBy) {
+      return this.userService.findUser({ where: { id: build.userId } }, true);
+    }
+    return build.createdBy;
   }
 
   @ResolveField()
   async action(@Parent() build: Build): Promise<Action> {
-    return this.actionService.findOne({ where: { id: build.actionId } });
+    if (!build.action) {
+      return this.actionService.findOne({ where: { id: build.actionId } });
+    }
+    return build.action;
+  }
+
+  @ResolveField()
+  async commit(@Parent() build: Build): Promise<Commit> {
+    return this.commitService.findOne({ where: { id: build.commitId } });
+  }
+
+  @ResolveField()
+  async resource(@Parent() build: Build): Promise<Resource> {
+    if (!build.resource) {
+      return this.resourceService.resource({ where: { id: build.resourceId } });
+    }
+    return build.resource;
   }
 
   @ResolveField()
@@ -65,24 +77,18 @@ export class BuildResolver {
 
   @ResolveField()
   status(@Parent() build: Build): Promise<EnumBuildStatus> {
-    return this.service.calcBuildStatus(build.id);
+    if (this.service.isBuildStale(build)) {
+      return this.service.calcBuildStatus(build.id);
+    }
+
+    if (build.status === EnumBuildStatus.Unknown) {
+      return this.service.calcBuildStatus(build.id);
+    }
+    return Promise.resolve(EnumBuildStatus[build.status]);
   }
 
-  @ResolveField(() => [Deployment])
-  deployments(
-    @Parent() build: Build,
-    @Args() args: FindManyDeploymentArgs
-  ): Promise<Deployment[]> {
-    return this.service.getDeployments(build.id, args);
-  }
-
-  @Mutation(() => Build)
-  @InjectContextValue(
-    InjectableResourceParameter.UserId,
-    'data.createdBy.connect.id'
-  )
-  @AuthorizeContext(AuthorizableResourceParameter.AppId, 'data.app.connect.id')
-  async createBuild(@Args() args: CreateBuildArgs): Promise<Build> {
-    return this.service.create(args);
+  @ResolveField(() => [BuildPlugin])
+  buildPlugins(@Parent() build: Build): Promise<BuildPlugin[]> {
+    return this.service.getBuildPlugins(build.id);
   }
 }

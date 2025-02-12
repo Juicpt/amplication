@@ -1,26 +1,35 @@
-import { Resolver, Mutation, Query, Args } from '@nestjs/graphql';
-import { UseGuards, UseFilters } from '@nestjs/common';
-import { Auth, User, Account } from 'src/models';
+import { UseFilters, UseGuards } from "@nestjs/common";
+import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
+import { Account, Auth, User } from "../../models";
 import {
-  LoginArgs,
-  SignupArgs,
+  ApiToken,
   ChangePasswordArgs,
-  SetCurrentWorkspaceArgs,
   CreateApiTokenArgs,
-  ApiToken
-} from './dto';
+  LoginArgs,
+  SetCurrentWorkspaceArgs,
+  SignupArgs,
+} from "./dto";
 
-import { AuthService } from './auth.service';
-import { GqlResolverExceptionsFilter } from 'src/filters/GqlResolverExceptions.filter';
-import { UserEntity } from 'src/decorators/user.decorator';
-import { GqlAuthGuard } from 'src/guards/gql-auth.guard';
-import { FindOneArgs } from 'src/dto';
-import { AuthorizeContext } from 'src/decorators/authorizeContext.decorator';
-import { AuthorizableResourceParameter } from 'src/enums/AuthorizableResourceParameter';
+import { CompleteInvitationArgs } from "../workspace/dto";
+
+import { AuthorizeContext } from "../../decorators/authorizeContext.decorator";
+import { UserEntity } from "../../decorators/user.decorator";
+import { FindOneArgs } from "../../dto";
+import { AuthorizableOriginParameter } from "../../enums/AuthorizableOriginParameter";
+import { GqlResolverExceptionsFilter } from "../../filters/GqlResolverExceptions.filter";
+import { GqlAuthGuard } from "../../guards/gql-auth.guard";
+import { AuthService } from "./auth.service";
+import { SignupWithBusinessEmailArgs } from "./dto/SignupWithBusinessEmailArgs";
+import { AuthUser } from "./types";
+import { PermissionsService } from "../permissions/permissions.service";
+
 @Resolver(() => Auth)
 @UseFilters(GqlResolverExceptionsFilter)
 export class AuthResolver {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly permissionsService: PermissionsService
+  ) {}
 
   @Query(() => User)
   @UseGuards(GqlAuthGuard)
@@ -28,9 +37,36 @@ export class AuthResolver {
     return user;
   }
 
+  @Query(() => [String])
+  @UseGuards(GqlAuthGuard)
+  async permissions(@UserEntity() user: AuthUser): Promise<string[]> {
+    return user.permissions;
+  }
+
+  @Query(() => [String])
+  @UseGuards(GqlAuthGuard)
+  async resourcePermissions(
+    @Args() args: FindOneArgs,
+    @UserEntity() user: AuthUser
+  ): Promise<string[]> {
+    return this.permissionsService.getUserResourceOrProjectPermissions(
+      user,
+      args.where.id,
+      undefined
+    );
+  }
+
+  @Mutation(() => Boolean)
+  async signupWithBusinessEmail(
+    @Args() args: SignupWithBusinessEmailArgs
+  ): Promise<boolean> {
+    return this.authService.signupWithBusinessEmail(args);
+  }
+
   @Mutation(() => Auth)
   async signup(@Args() args: SignupArgs): Promise<Auth> {
     const { data } = args;
+
     data.email = data.email.toLowerCase();
     const token = await this.authService.signup(data);
     return { token };
@@ -45,14 +81,15 @@ export class AuthResolver {
 
   @Mutation(() => ApiToken)
   @UseGuards(GqlAuthGuard)
+  @AuthorizeContext(AuthorizableOriginParameter.None, "", "apiToken.create")
   async createApiToken(
     @UserEntity() user: User,
     @Args() args: CreateApiTokenArgs
   ): Promise<ApiToken> {
     args.data.user = {
       connect: {
-        id: user.id
-      }
+        id: user.id,
+      },
     };
     return this.authService.createApiToken(args);
   }
@@ -78,7 +115,7 @@ export class AuthResolver {
 
   @Mutation(() => ApiToken)
   @UseGuards(GqlAuthGuard)
-  @AuthorizeContext(AuthorizableResourceParameter.ApiTokenId, 'where.id')
+  @AuthorizeContext(AuthorizableOriginParameter.ApiTokenId, "where.id")
   async deleteApiToken(
     @UserEntity() user: User,
     @Args() args: FindOneArgs
@@ -93,12 +130,25 @@ export class AuthResolver {
     @Args() args: SetCurrentWorkspaceArgs
   ): Promise<Auth> {
     if (!user.account) {
-      throw new Error('User has no account');
+      throw new Error("User has no account");
     }
     const token = await this.authService.setCurrentWorkspace(
       user.account.id,
       args.data.id
     );
+    return { token };
+  }
+
+  @Mutation(() => Auth)
+  @UseGuards(GqlAuthGuard)
+  async completeInvitation(
+    @UserEntity() user: User,
+    @Args() args: CompleteInvitationArgs
+  ): Promise<Auth> {
+    if (!user.account) {
+      throw new Error("User has no account");
+    }
+    const token = await this.authService.completeInvitation(user, args);
     return { token };
   }
 }

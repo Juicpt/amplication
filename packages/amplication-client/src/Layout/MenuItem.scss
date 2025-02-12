@@ -24,7 +24,7 @@ $inverted-border-radius: 6px;
     white-space: nowrap;
     opacity: 0;
     transition: all var(--menu-expand-animation-duration) ease-in;
-    color: var(--black40);
+    color: var(--gray-40);
     padding-left: 0;
     width: 0;
     letter-spacing: normal;
@@ -32,7 +32,7 @@ $inverted-border-radius: 6px;
 
   &__badge {
     @include counterBadge;
-    background-color: var(--negative-light);
+    background-color: var(--theme-light-red);
     color: var(--static-white);
   }
 
@@ -48,6 +48,7 @@ $inverted-border-radius: 6px;
     transition: all var(--menu-expand-animation-duration) ease-in;
     box-sizing: border-box;
     color: var(--menu-item-color);
+    height: auto;
   }
 
   &--active {
@@ -56,15 +57,22 @@ $inverted-border-radius: 6px;
     }
   }
 
-  &--active:before,
-  &:hover:before {
+  &:before {
     width: $select-item-width;
     height: $select-item-width;
     border-radius: var(--default-border-radius);
-    background-color: var(--menu-item-active-background);
     content: "";
     position: absolute;
     left: calc(50% - #{$select-item-width * 0.5});
+  }
+
+  &--active:before,
+  &:hover:before {
+    background-color: var(--menu-item-active-background);
+  }
+
+  &--no-hover:before {
+    display: none;
   }
 
   &--with-fixed-panel {
@@ -75,7 +83,7 @@ $inverted-border-radius: 6px;
       border-radius: var(--default-border-radius);
       border-top-right-radius: 0;
       border-bottom-right-radius: 0;
-      background-color: var(--white);
+      background-color: var(--gray-full);
       content: "";
       position: absolute;
       right: 0;
@@ -89,7 +97,7 @@ $inverted-border-radius: 6px;
         width: calc(100% - (100% - #{$select-item-width}) / 2);
       }
       i {
-        color: var(--black80);
+        color: var(--gray-20);
       }
     }
   }

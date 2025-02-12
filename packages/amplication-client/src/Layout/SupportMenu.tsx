@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import { useTracking } from "../util/analytics";
+import { AnalyticsEventNames } from "../util/analytics-events.types";
 import "./SupportMenu.scss";
 
 const CLASS_NAME = "support-menu";
@@ -9,25 +10,25 @@ const SupportMenu = () => {
 
   const handleDocsClick = useCallback(() => {
     trackEvent({
-      eventName: "supportDocsClick",
+      eventName: AnalyticsEventNames.SupportDocsClick,
     });
   }, [trackEvent]);
 
   const handleCommunityClick = useCallback(() => {
     trackEvent({
-      eventName: "supportCommunityClick",
+      eventName: AnalyticsEventNames.SupportCommunityClick,
     });
   }, [trackEvent]);
 
   const handleFeatureRequestClick = useCallback(() => {
     trackEvent({
-      eventName: "supportFeatureRequestClick",
+      eventName: AnalyticsEventNames.SupportFeatureRequestClick,
     });
   }, [trackEvent]);
 
   const handleIssueClick = useCallback(() => {
     trackEvent({
-      eventName: "supportIssueClick",
+      eventName: AnalyticsEventNames.SupportIssueClick,
     });
   }, [trackEvent]);
 
@@ -42,7 +43,7 @@ const SupportMenu = () => {
         Docs
       </a>
       <a
-        href="https://discord.gg/Z2CG3rUFnu"
+        href="https://amplication.com/discord"
         target="community"
         rel="noopener"
         onClick={handleCommunityClick}
@@ -50,7 +51,7 @@ const SupportMenu = () => {
         Community
       </a>
       <a
-        href="https://github.com/amplication/amplication/issues/new?assignees=&labels=type%3A%20bug&template=bug_report.md&title="
+        href="https://github.com/amplication/amplication/issues/new/choose"
         target="githubissue"
         rel="noopener"
         onClick={handleIssueClick}
@@ -58,7 +59,7 @@ const SupportMenu = () => {
         Report an issue
       </a>
       <a
-        href="https://github.com/amplication/amplication/issues/new?assignees=&labels=type%3A%20feature%20request&template=feature_request.md&title="
+        href="https://github.com/amplication/amplication/issues/new/choose"
         target="githubfeature"
         rel="noopener"
         onClick={handleFeatureRequestClick}

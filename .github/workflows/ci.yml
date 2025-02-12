@@ -1,141 +1,121 @@
-# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
-# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
-
-name: CI
+name: Continuous Integration
+concurrency: ${{ github.ref }}
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/**.yml"
-      - "renovate.json"
-      - ".all-contributorsrc"
+    inputs:
+      nx-base:
+        type: string
+        description: Commit SHA, branch or tag name used by Nx in the affected jobs.
+        required: true
+        default: next
+      nx-skip-cache:
+        type: boolean
+        description: Rerun the tasks even when the results are available in the cache.
+        default: false
+      nx-force-all:
+        type: boolean
+        description: Forces Nx to consider all projects (apps and libs) as affected.
+        default: false
   pull_request:
-    branches: [master]
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/**.yml"
-      - "renovate.json"
-      - ".all-contributorsrc"
+    types: [opened, reopened, synchronize]
+  push:
+    branches:
+      - master
+      - next
+
+env:
+  NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+  NX_REJECT_UNKNOWN_LOCAL_CACHE: 0
+  NX_BRANCH: ${{ github.head_ref || github.ref_name }}
+  NX_FORCE_ALL: ${{ fromJSON('["", "--all"]')[ inputs.nx-force-all ] }} # This relies on type coercion, an implicit cast from boolean true to 1 or false to 0, which is then used as array index.
+  NX_AFFECTED_OR_ALL: ${{ fromJSON('["affected", "run-many --all"]')[ inputs.nx-force-all ] }}
+  NX_SKIP_NX_CACHE: ${{ inputs.nx-skip-cache || false }}
+  BASE: ${{ github.base_ref || inputs.nx-base || github.event.repository.default_branch }}
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+  ci:
+    name: Continuous Integration
+    if: github.event_name == 'push' || ( github.event_name == 'pull_request' && github.head_ref != 'next' ) || github.event_name  == 'workflow_dispatch'
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Fetch master
-        run: git fetch --no-tags --prune --depth=1 origin +refs/heads/master:refs/remotes/origin/master
-      - name: Use Node.js
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
         with:
-          node-version: 16.x
-      - name: Update npm
-        run: npm i -g npm@7.3.0
-      - name: Cache node modules
-        uses: actions/cache@v2
+          fetch-depth: 0
+
+      - uses: nrwl/nx-set-shas@v4
         with:
-          path: |
-            ~/.npm
-            node_modules
-            */*/node_modules
-          key: ${{ runner.os }}-node-2-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-2-
-      - run: npm ci
-      - name: Install packages' dependencies
-        run: npm run bootstrap -- --loglevel verbose
-      - name: Update Prisma client
-        run: npm run prisma:generate
-      - name: Define Lerna since parameter
-        run: echo "SINCE=origin/master" >> $GITHUB_ENV
-        if: ${{ github.ref != 'refs/heads/master' }}
-      - name: Check format
-        run: npm run check-format -- --since $SINCE
-      - name: Build packages
-        run: npm run build -- --since $SINCE
+          main-branch-name: ${{ env.BASE }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: "package.json"
+          cache: "npm"
+          cache-dependency-path: "**/package-lock.json"
+
+      - name: Cache global node modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Dependencies
+        if: ${{ steps.cache-node-modules.outputs.cache-hit != 'true' }}
+        run: npm ci
+
+      - name: Nx Workspace Lint
+        run: npx nx workspace-lint
+
+      - name: Nx Format Check
+        run: npx nx format:check $NX_FORCE_ALL
+
       - name: Lint
-        run: npm run lint -- --since $SINCE
-      - name: Check GraphQL schema
-        run: npm run check-graphql-schema -- --since $SINCE
-      - name: Run tests
-        run: npm test -- --since $SINCE
-      # E2E tests to run on merge to master
-      - name: Generate test data service
-        run: npm run generate-test-data-service
-        if: github.ref == 'refs/heads/master' || contains(github.head_ref, 'ci') || github.actor == 'renovate[bot]'
-      - name: Install test data service's dependencies
-        working-directory: packages/amplication-data-service-generator/generated/server
-        run: npm ci && npm run prisma:generate
-        if: github.ref == 'refs/heads/master' || contains(github.head_ref, 'ci') || github.actor == 'renovate[bot]'
-      - name: Run test data service's tests
-        working-directory: packages/amplication-data-service-generator/generated/server
-        run: npm test
-        if: github.ref == 'refs/heads/master' || contains(github.head_ref, 'ci') || github.actor == 'renovate[bot]'
-      - name: Run Data Service Generator E2E test
-        run: npm run test:e2e -- --scope @amplication/data-service-generator
-        if: github.ref == 'refs/heads/master' || contains(github.head_ref, 'ci') || github.actor == 'renovate[bot]'
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    if: github.ref == 'refs/heads/master' || contains('ci', github.ref)
-    steps:
-      - uses: actions/checkout@v2
-      - uses: docker/setup-buildx-action@v1
-        with:
-          driver-opts: image=moby/buildkit:master
-      - name: Login to Docker Hub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-      - name: Login to GCR
-        uses: docker/login-action@v1
-        with:
-          registry: gcr.io
-          username: _json_key
-          password: ${{ secrets.GOOGLE_CREDENTIALS }}
-      # cache was removed because it didn't reduce the runtime
-      # - name: Cache Docker layers
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: /tmp/.buildx-cache
-      #     key: ${{ runner.os }}-buildx-${{ github.sha }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-buildx-
-      - name: "Build and push amplication/amplication Docker image"
-        uses: docker/build-push-action@v2
-        with:
-          pull: true
-          push: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-          tags: |
-            amplication/amplication:latest
-            amplication/amplication:${{ github.sha }}
-            gcr.io/amplication/amplication:${{ github.sha }}
-      - uses: hashicorp/setup-terraform@v1
-      - run: terraform init
+        run: npx nx $NX_AFFECTED_OR_ALL --target=lint --parallel=3
+
+      - name: Build
+        run: |
+          npx nx $NX_AFFECTED_OR_ALL --target=build --parallel=3
+          npx nx $NX_AFFECTED_OR_ALL --target=postbuild --parallel=3
+
+      - name: Get number of CPU cores
+        uses: SimenB/github-actions-cpu-cores@v2
+        id: cpu-cores
+
+      - name: Test
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-        working-directory: terraform/envs/dev
-      - run: terraform apply -auto-approve -lock-timeout=1200s
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          TF_VAR_image_id: gcr.io/amplication/amplication:${{ github.sha }}
-          TF_VAR_github_app_private_key: ${{ secrets.STAGING_GITHUB_APP_PRIVATE_KEY }}
-          TF_VAR_github_app_client_secret: ${{ secrets.STAGING_GITHUB_APP_CLIENT_SECRET }}
-        working-directory: terraform/envs/dev
-      - uses: mattes/gce-cloudsql-proxy-action@v1
-        with:
-          creds: ${{ secrets.GOOGLE_CREDENTIALS }}
-          instance: ${{ secrets.STAGING_DB_INSTANCE_NAME }}
-      - run: |
-          set -e;
-          docker run \
-            --network host \
-            --env POSTGRESQL_URL="postgresql://${{ secrets.STAGING_DB_USER }}:${{ secrets.STAGING_DB_PASSWORD }}@127.0.0.1:5432/${{ secrets.STAGING_DB_NAME }}" \
-            amplication/amplication:${{ github.sha }} \
-            npm run migrate:up
+          NODE_OPTIONS: "--max_old_space_size=4096"
+        run: npx nx $NX_AFFECTED_OR_ALL --target=test --coverage --maxWorkers=${{ steps.cpu-cores.outputs.count }}
+
+  nx:
+    name: Nx
+    needs: ci
+    if: ${{ github.ref_name == 'master' || github.ref_name == 'next' }}
+    uses: ./.github/workflows/nx.template.yml
+    with:
+      nx-head: ${{ github.head_ref && format('refs/pull/{0}/merge', github.event.number) || github.ref_name  }}
+      nx-base: ${{ github.base_ref || inputs.nx-base || github.event.repository.default_branch }}
+      nx-skip-cache: ${{ inputs.nx-skip-cache || false }} # This relies on type coercion, an implicit cast from boolean true to 1 or false to 0, which is then used as array index.
+      nx-force-all: ${{ inputs.nx-force-all || false }}
+
+  release:
+    name: Release
+    needs: nx
+    uses: ./.github/workflows/release.template.yml
+    if: ${{ github.ref_name == 'master' || github.ref_name == 'next' }}
+    with:
+      default-branch: ${{ github.event.repository.default_branch }}
+      branch: ${{ github.ref_name }}
+      affected-apps: ${{ needs.nx.outputs.affected-apps }}
+      affected-lib: ${{ needs.nx.outputs.affected-lib }}
+      affected-package-container: ${{ needs.nx.outputs.affected-package-container }}
+      affected-deploy-static: ${{ needs.nx.outputs.affected-deploy-static }}
+      affected-deploy-container: ${{ needs.nx.outputs.affected-deploy-container }}
+    secrets:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      ECR_AWS_ACCESS_KEY_ID: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
+      ECR_AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

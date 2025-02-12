@@ -4,14 +4,24 @@ $log-line-number-width: 30px;
 $step-status-width: 20px;
 
 .action-log {
+  display: flex;
+  flex: 1;
+
   background-color: var(--action-log-background-color);
   height: 100%;
   overflow: auto;
-  display: flex;
   flex-direction: column;
   justify-content: stretch;
   align-items: stretch;
   box-sizing: border-box;
+
+  &__success {
+    border: 1px solid var(--color-positive);
+  }
+
+  &__failed {
+    border: 1px solid var(--color-negative);
+  }
 
   &__empty-state {
     @include sectionTitle;
@@ -51,7 +61,11 @@ $step-status-width: 20px;
   &__body {
     flex: 1;
     overflow: auto;
-    @include scrollbars($default-scroll-width, var(--black60), transparent);
+    @include scrollbars($default-scroll-width, var(--gray-30), transparent);
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--gray-30);
+    }
+
     box-sizing: border-box;
   }
   &__step {
@@ -71,11 +85,11 @@ $step-status-width: 20px;
       width: $step-status-width;
 
       &--success {
-        color: var(--positive-default);
+        color: var(--theme-green);
       }
 
       &--failed {
-        color: var(--negative);
+        color: var(--theme-red);
       }
 
       &--running {
@@ -100,10 +114,9 @@ $step-status-width: 20px;
   }
 
   .react-lazylog {
-    color: var(--black10);
+    color: var(--gray-70);
     background-color: var(--action-log-background-color);
-    height: auto !important;
-    @include scrollbars($default-scroll-width, var(--black60), transparent);
+    @include scrollbars($default-scroll-width, var(--gray-30), transparent);
 
     .log-line {
       //line number
@@ -112,5 +125,10 @@ $step-status-width: 20px;
         width: $log-line-number-width;
       }
     }
+  }
+  .__auto__height {
+    height: auto !important;
+    font-family: "Monaco", monospace;
+    font-size: 12px;
   }
 }

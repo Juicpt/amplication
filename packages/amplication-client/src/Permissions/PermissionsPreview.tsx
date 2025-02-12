@@ -38,7 +38,7 @@ function PermissionsPreview({
 
   return (
     <div className="permissions-preview">
-      {Boolean(error) ? (
+      {error ? (
         errorMessage
       ) : (
         <div className="permissions-preview__actions">
@@ -75,7 +75,7 @@ export const GET_ENTITY_PERMISSIONS = gql`
         type
         permissionRoles {
           id
-          appRoleId
+          resourceRoleId
         }
       }
     }

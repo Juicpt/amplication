@@ -1,12 +1,10 @@
 import React, { useMemo } from "react";
 import { Formik, FormikErrors } from "formik";
-import omit from "lodash.omit";
-import { isEmpty } from "lodash";
-import { getSchemaForDataType } from "@amplication/data";
-import { ToggleField } from "@amplication/design-system";
+import { omit, isEmpty } from "lodash";
+import { getSchemaForDataType } from "@amplication/code-gen-types";
+import { TextField, ToggleField, Form } from "@amplication/ui/design-system";
 import * as models from "../models";
 import { DisplayNameField } from "../Components/DisplayNameField";
-import { Form } from "../Components/Form";
 import NameField from "../Components/NameField";
 import OptionalDescriptionField from "../Components/OptionalDescriptionField";
 import FormikAutoSave from "../util/formikAutoSave";
@@ -23,16 +21,23 @@ export type Values = {
   unique: boolean;
   required: boolean;
   searchable: boolean;
+  customAttributes: string | null;
   description: string | null;
-  properties: Object;
+  permanentId?: string | null;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  properties: {
+    relatedEntityId?: string;
+    allowMultipleSelection?: string;
+  };
 };
 
 type Props = {
   onSubmit: (values: Values) => void;
-  isDisabled?: boolean;
   defaultValues?: Partial<models.EntityField>;
-  applicationId: string;
-  entityDisplayName: string;
+  resourceId: string;
+  entity: models.Entity;
+  isSystemDataType?: boolean;
+  isAuthEntitySpecificDataType?: boolean;
 };
 
 const FORM_SCHEMA = {
@@ -59,6 +64,7 @@ export const INITIAL_VALUES: Values = {
   unique: false,
   required: false,
   searchable: false,
+  customAttributes: null,
   description: "",
   properties: {},
 };
@@ -66,9 +72,10 @@ export const INITIAL_VALUES: Values = {
 const EntityFieldForm = ({
   onSubmit,
   defaultValues = {},
-  isDisabled,
-  applicationId,
-  entityDisplayName,
+  resourceId,
+  entity,
+  isSystemDataType,
+  isAuthEntitySpecificDataType,
 }: Props) => {
   const initialValues = useMemo(() => {
     const sanitizedDefaultValues = omit(
@@ -81,12 +88,6 @@ const EntityFieldForm = ({
     };
   }, [defaultValues]);
 
-  function onKeyDown(keyEvent:any) {
-    if ((keyEvent.charCode || keyEvent.keyCode) === 13) {
-      keyEvent.preventDefault();
-    }
-  }
-
   return (
     <Formik
       initialValues={initialValues}
@@ -97,11 +98,13 @@ const EntityFieldForm = ({
         );
         //validate the field dynamic properties
         const schema = getSchemaForDataType(values.dataType);
-        const propertiesError = validate<Object>(values.properties, schema);
+        const propertiesError = validate<{
+          relatedEntityId?: string;
+          allowMultipleSelection?: string;
+        }>(values.properties, schema);
 
         // Ignore related field ID error
         if ("relatedFieldId" in propertiesError) {
-          // @ts-ignore
           delete propertiesError.relatedFieldId;
         }
 
@@ -118,50 +121,78 @@ const EntityFieldForm = ({
         const schema = getSchemaForDataType(formik.values.dataType);
 
         return (
-          <Form childrenAsBlocks onKeyDown={onKeyDown}>
-            {!isDisabled && <FormikAutoSave debounceMS={1000} />}
+          <Form childrenAsBlocks>
+            <FormikAutoSave debounceMS={1000} />
 
             <DisplayNameField
               name="displayName"
               label="Display Name"
-              disabled={isDisabled}
+              disabled={isSystemDataType}
               required
             />
-            <NameField name="name" disabled={isDisabled} required />
+            <NameField name="name" disabled={isSystemDataType} required />
             <OptionalDescriptionField
               name="description"
               label="Description"
-              disabled={isDisabled}
+              disabled={isSystemDataType}
             />
             <div>
               <ToggleField
                 name="unique"
                 label="Unique Field"
-                disabled={isDisabled}
+                disabled={isSystemDataType || isAuthEntitySpecificDataType}
               />
             </div>
             <div>
               <ToggleField
                 name="required"
                 label="Required Field"
-                disabled={isDisabled}
+                disabled={isSystemDataType}
               />
             </div>
             <div>
               <ToggleField
                 name="searchable"
                 label="Searchable"
-                disabled={isDisabled}
+                disabled={isSystemDataType}
               />
             </div>
             {!SYSTEM_DATA_TYPES.has(formik.values.dataType) && (
-              <DataTypeSelectField label="Data Type" disabled={isDisabled} />
+              <DataTypeSelectField
+                label="Data Type"
+                disabled={isSystemDataType}
+              />
             )}
+
             <SchemaFields
+              fieldDataType={formik.values.dataType}
               schema={schema}
-              isDisabled={isDisabled}
-              applicationId={applicationId}
-              entityDisplayName={entityDisplayName}
+              resourceId={resourceId}
+              entity={entity}
+            />
+
+            <TextField
+              autoComplete="off"
+              placeholder="Custom Prisma Attributes"
+              inputToolTip={{
+                content: (
+                  <span>
+                    Add custom attributes to fields using the format
+                    @attribute([parameters]) or @attribute. <br />
+                    <br /> For example:
+                    <br />
+                    @map(name: "fieldName")
+                    <br />
+                    @unique
+                    <br />
+                    @default(value)
+                  </span>
+                ),
+              }}
+              textarea
+              rows={3}
+              name="customAttributes"
+              label="Custom Attributes"
             />
           </Form>
         );

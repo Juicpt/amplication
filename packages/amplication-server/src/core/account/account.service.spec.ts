@@ -1,14 +1,15 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AccountService } from './account.service';
-import { PrismaService } from 'nestjs-prisma';
-import { Account } from '@prisma/client';
+import { PrismaService, Account } from "../../prisma";
+import { Test, TestingModule } from "@nestjs/testing";
+import { AccountService } from "./account.service";
+import { IdentityProvider } from "../auth/auth.types";
+import { MockedSegmentAnalyticsProvider } from "../../services/segmentAnalytics/tests";
 
-const EXAMPLE_ACCOUNT_ID = 'ExampleAccountId',
-  EXAMPLE_EMAIL = 'example@email.com',
-  EXAMPLE_FIRST_NAME = 'John',
-  EXAMPLE_LAST_NAME = 'Doe',
-  EXAMPLE_PASSWORD = 'Password',
-  EXAMPLE_CURRENT_USER_ID = 'ExampleUserId';
+const EXAMPLE_ACCOUNT_ID = "ExampleAccountId",
+  EXAMPLE_EMAIL = "example@email.com",
+  EXAMPLE_FIRST_NAME = "John",
+  EXAMPLE_LAST_NAME = "Doe",
+  EXAMPLE_PASSWORD = "Password",
+  EXAMPLE_CURRENT_USER_ID = "ExampleUserId";
 
 const EXAMPLE_ACCOUNT: Account = {
   id: EXAMPLE_ACCOUNT_ID,
@@ -19,8 +20,15 @@ const EXAMPLE_ACCOUNT: Account = {
   lastName: EXAMPLE_LAST_NAME,
   password: EXAMPLE_PASSWORD,
   currentUserId: EXAMPLE_CURRENT_USER_ID,
-  githubId: null
+  githubId: null,
 };
+
+const segmentAnalyticsIdentifyMock = jest.fn(() => {
+  return;
+});
+const segmentAnalyticsTrackMock = jest.fn(() => {
+  return;
+});
 
 const prismaAccountCreateMock = jest.fn(() => {
   return EXAMPLE_ACCOUNT;
@@ -34,13 +42,18 @@ const prismaAccountUpdateMock = jest.fn(() => {
   return EXAMPLE_ACCOUNT;
 });
 
-describe('AccountService', () => {
+describe("AccountService", () => {
   let service: AccountService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        MockedSegmentAnalyticsProvider({
+          identifyMock: segmentAnalyticsIdentifyMock,
+          trackWithContextMock: segmentAnalyticsTrackMock,
+          trackManualMock: segmentAnalyticsTrackMock,
+        }),
         AccountService,
         {
           provide: PrismaService,
@@ -48,75 +61,88 @@ describe('AccountService', () => {
             account: {
               create: prismaAccountCreateMock,
               findUnique: prismaAccountFindOneMock,
-              update: prismaAccountUpdateMock
-            }
-          }))
-        }
-      ]
+              update: prismaAccountUpdateMock,
+            },
+          })),
+        },
+      ],
     }).compile();
 
     service = module.get<AccountService>(AccountService);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 
-  it('should create an account', () => {
+  it("should create an account", async () => {
     const args = {
       data: {
         email: EXAMPLE_EMAIL,
         firstName: EXAMPLE_FIRST_NAME,
         lastName: EXAMPLE_LAST_NAME,
-        password: EXAMPLE_PASSWORD
-      }
+        password: EXAMPLE_PASSWORD,
+      },
     };
-    expect(service.createAccount(args)).toEqual(EXAMPLE_ACCOUNT);
+    expect(
+      await service.createAccount(args, {
+        identityProvider: IdentityProvider.Local,
+      })
+    ).toEqual(EXAMPLE_ACCOUNT);
     expect(prismaAccountCreateMock).toBeCalledTimes(1);
     expect(prismaAccountCreateMock).toBeCalledWith(args);
+    expect(segmentAnalyticsIdentifyMock).toBeCalledTimes(1);
+    expect(segmentAnalyticsTrackMock).toBeCalledTimes(1);
+    expect(segmentAnalyticsIdentifyMock).toBeCalledWith({
+      accountId: EXAMPLE_ACCOUNT_ID,
+      createdAt: expect.any(Date),
+      email: EXAMPLE_EMAIL,
+      firstName: EXAMPLE_FIRST_NAME,
+      lastName: EXAMPLE_LAST_NAME,
+    });
   });
 
-  it('should find one account', () => {
+  it("should find one account", () => {
     const args = {
       where: {
         id: EXAMPLE_ACCOUNT_ID,
-        email: EXAMPLE_EMAIL
-      }
+        email: EXAMPLE_EMAIL,
+      },
     };
     expect(service.findAccount(args)).toEqual(EXAMPLE_ACCOUNT);
     expect(prismaAccountFindOneMock).toBeCalledTimes(1);
     expect(prismaAccountFindOneMock).toBeCalledWith(args);
   });
 
-  it('should update an account', () => {
+  it("should update an account", () => {
     const args = {
       where: { id: EXAMPLE_ACCOUNT_ID },
       data: {
         firstName: EXAMPLE_FIRST_NAME,
-        lastName: EXAMPLE_LAST_NAME
-      }
+        lastName: EXAMPLE_LAST_NAME,
+      },
     };
     expect(service.updateAccount(args)).toEqual(EXAMPLE_ACCOUNT);
     expect(prismaAccountUpdateMock).toBeCalledTimes(1);
     expect(prismaAccountUpdateMock).toBeCalledWith(args);
   });
 
-  it('should set the current user', () => {
+  it("should set the current user", () => {
     const args = {
       accountId: EXAMPLE_ACCOUNT_ID,
-      userId: EXAMPLE_CURRENT_USER_ID
+      userId: EXAMPLE_CURRENT_USER_ID,
     };
     const returnArgs = {
       data: {
         currentUser: {
           connect: {
-            id: args.userId
-          }
-        }
+            id: args.userId,
+          },
+        },
       },
       where: {
-        id: args.accountId
-      }
+        id: args.accountId,
+      },
     };
     expect(service.setCurrentUser(args.accountId, args.userId)).toEqual(
       EXAMPLE_ACCOUNT
@@ -125,16 +151,16 @@ describe('AccountService', () => {
     expect(prismaAccountUpdateMock).toBeCalledWith(returnArgs);
   });
 
-  it('should set a password', async () => {
+  it("should set a password", async () => {
     const args = {
       accountId: EXAMPLE_ACCOUNT_ID,
-      password: EXAMPLE_PASSWORD
+      password: EXAMPLE_PASSWORD,
     };
     const returnArgs = {
       data: {
-        password: args.password
+        password: args.password,
       },
-      where: { id: args.accountId }
+      where: { id: args.accountId },
     };
     expect(await service.setPassword(args.accountId, args.password)).toEqual(
       EXAMPLE_ACCOUNT

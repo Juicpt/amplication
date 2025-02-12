@@ -1,68 +1,74 @@
-import { ArgumentsHost, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { TestingModule, Test } from '@nestjs/testing';
-import { Prisma } from '@prisma/client';
-import { ApolloError } from 'apollo-server-express';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { AmplicationError } from '../errors/AmplicationError';
+import { ArgumentsHost, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { TestingModule, Test } from "@nestjs/testing";
+import { Prisma } from "../prisma";
+import { ApolloError } from "apollo-server-express";
+import { AmplicationError } from "../errors/AmplicationError";
 import {
   createRequestData,
   GqlResolverExceptionsFilter,
-  InternalServerError,
   PRISMA_CODE_UNIQUE_KEY_VIOLATION,
   RequestData,
-  UniqueKeyException
-} from './GqlResolverExceptions.filter';
+} from "./GqlResolverExceptions.filter";
+import { AmplicationLogger } from "@amplication/util/nestjs/logging";
+import { BillingLimitationError } from "../errors/BillingLimitationError";
+import { GraphQLBillingError } from "../errors/graphql/graphql-billing-limitation-error";
+import { GraphQLInternalServerError } from "../errors/graphql/graphql-internal-server-error";
+import { GraphQLUniqueKeyException } from "../errors/graphql/graphql-unique-key-error";
+import { BillingFeature } from "@amplication/util-billing-types";
 
-const winstonErrorMock = jest.fn();
-const winstonInfoMock = jest.fn();
-const configServiceGetMock = jest.fn(() => 'production');
+const errorMock = jest.fn();
+const infoMock = jest.fn();
+const configServiceGetMock = jest.fn(() => "production");
 const prepareRequestDataMock = jest.fn(() => null);
 
-const EXAMPLE_ERROR_MESSAGE = 'Example Error Message';
-const EXAMPLE_FIELDS = ['exampleField', 'exampleOtherField'];
+const EXAMPLE_ERROR_MESSAGE = "Example Error Message";
+const EXAMPLE_FIELDS = ["exampleField", "exampleOtherField"];
 const EXAMPLE_PRISMA_UNKNOWN_ERROR = new Prisma.PrismaClientKnownRequestError(
-  'Example Prisma unknown error message',
-  'UNKNOWN_CODE',
-  Prisma.prismaVersion.client
+  "Example Prisma unknown error message",
+  { code: "UNKNOWN_CODE", clientVersion: Prisma.prismaVersion.client }
 );
 const EXAMPLE_ERROR = new Error(EXAMPLE_ERROR_MESSAGE);
-const EXAMPLE_QUERY = 'EXAMPLE_QUERY';
-const EXAMPLE_HOSTNAME = 'EXAMPLE_HOSTNAME';
-const EXAMPLE_IP = 'EXAMPLE_IP';
-const EXAMPLE_USER_ID = 'EXAMPLE_USER_ID';
+const EXAMPLE_QUERY = "EXAMPLE_QUERY";
+const EXAMPLE_HOSTNAME = "EXAMPLE_HOSTNAME";
+const EXAMPLE_IP = "EXAMPLE_IP";
+const EXAMPLE_USER_ID = "EXAMPLE_USER_ID";
 const EXAMPLE_REQUEST = {
   hostname: EXAMPLE_HOSTNAME,
-  ip: EXAMPLE_IP
+  ip: EXAMPLE_IP,
 };
 const EXAMPLE_BODY = {
-  query: EXAMPLE_QUERY
+  query: EXAMPLE_QUERY,
 };
 const EXAMPLE_USER = {
-  id: EXAMPLE_USER_ID
+  id: EXAMPLE_USER_ID,
 };
 
-describe('GqlResolverExceptionsFilter', () => {
+describe("GqlResolverExceptionsFilter", () => {
   let filter: GqlResolverExceptionsFilter;
   beforeEach(async () => {
+    jest.clearAllMocks();
+  });
+
+  beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
           provide: ConfigService,
           useValue: {
-            get: configServiceGetMock
-          }
+            get: configServiceGetMock,
+          },
         },
         {
-          provide: WINSTON_MODULE_PROVIDER,
+          provide: AmplicationLogger,
           useValue: {
-            error: winstonErrorMock,
-            info: winstonInfoMock
-          }
+            error: errorMock,
+            info: infoMock,
+          },
         },
-        GqlResolverExceptionsFilter
+        GqlResolverExceptionsFilter,
       ],
-      imports: null
+      imports: null,
     }).compile();
 
     filter = module.get<GqlResolverExceptionsFilter>(
@@ -70,109 +76,149 @@ describe('GqlResolverExceptionsFilter', () => {
     );
     // Override prepareRequestData to avoid passing a valid ArgumentHost
     filter.prepareRequestData = prepareRequestDataMock;
-
-    jest.clearAllMocks();
   });
-  const cases: Array<[
-    string,
-    Error,
-    Error,
-    [string, { requestData: RequestData | null }] | [Error] | null,
-    [string, { requestData: RequestData | null }] | null
-  ]> = [
+
+  const cases: Array<
     [
-      'PrismaClientKnownRequestError unique key',
-      new Prisma.PrismaClientKnownRequestError(
-        EXAMPLE_ERROR_MESSAGE,
-        PRISMA_CODE_UNIQUE_KEY_VIOLATION,
-        Prisma.prismaVersion.client,
-        { target: EXAMPLE_FIELDS }
-      ),
-      new UniqueKeyException(EXAMPLE_FIELDS),
+      string,
+      Error,
+      Error,
+      [string, { requestData: RequestData | null }] | [string, Error] | null,
+      [string, { requestData: RequestData | null }] | null
+    ]
+  > = [
+    [
+      "PrismaClientKnownRequestError unique key",
+      new Prisma.PrismaClientKnownRequestError(EXAMPLE_ERROR_MESSAGE, {
+        code: PRISMA_CODE_UNIQUE_KEY_VIOLATION,
+        clientVersion: Prisma.prismaVersion.client,
+        meta: {
+          target: EXAMPLE_FIELDS,
+        },
+      }),
+      new GraphQLUniqueKeyException(EXAMPLE_FIELDS),
       null,
-      [new UniqueKeyException(EXAMPLE_FIELDS).message, { requestData: null }]
+      [
+        new GraphQLUniqueKeyException(EXAMPLE_FIELDS).message,
+        { requestData: null },
+      ],
     ],
     [
-      'PrismaClientKnownRequestError unknown',
+      "PrismaClientKnownRequestError unknown",
       EXAMPLE_PRISMA_UNKNOWN_ERROR,
-      new InternalServerError(),
-      [EXAMPLE_PRISMA_UNKNOWN_ERROR],
-      null
+      new GraphQLInternalServerError(),
+      [EXAMPLE_PRISMA_UNKNOWN_ERROR.message, EXAMPLE_PRISMA_UNKNOWN_ERROR],
+      null,
     ],
     [
-      'AmplicationError',
+      "AmplicationError",
       new AmplicationError(EXAMPLE_ERROR_MESSAGE),
       new ApolloError(EXAMPLE_ERROR_MESSAGE),
       null,
-      [EXAMPLE_ERROR_MESSAGE, { requestData: null }]
+      [EXAMPLE_ERROR_MESSAGE, { requestData: null }],
     ],
     [
-      'HttpException',
+      "HttpException",
       new NotFoundException(EXAMPLE_ERROR_MESSAGE),
       new ApolloError(EXAMPLE_ERROR_MESSAGE),
       null,
-      [EXAMPLE_ERROR_MESSAGE, { requestData: null }]
+      [EXAMPLE_ERROR_MESSAGE, { requestData: null }],
     ],
-    ['Error', EXAMPLE_ERROR, new InternalServerError(), [EXAMPLE_ERROR], null]
+    [
+      "Error",
+      EXAMPLE_ERROR,
+      new GraphQLInternalServerError(),
+      [EXAMPLE_ERROR.message, EXAMPLE_ERROR],
+      null,
+    ],
+    [
+      "BillingLimitationError",
+      new BillingLimitationError(
+        "Allowed services per workspace: 1",
+        BillingFeature.Services
+      ),
+      new GraphQLBillingError(
+        "LimitationError: Allowed services per workspace: 1",
+        BillingFeature.Services,
+        false
+      ),
+      null,
+      null,
+    ],
+    [
+      "BillingLimitationError bypassAllowed",
+      new BillingLimitationError(
+        "Allowed services per workspace: 1",
+        BillingFeature.Services,
+        true
+      ),
+      new GraphQLBillingError(
+        "LimitationError: Allowed services per workspace: 1",
+        BillingFeature.Services,
+        true
+      ),
+      null,
+      null,
+    ],
   ];
-  test.each(cases)('%s', (name, exception, expected, errorArgs, infoArgs) => {
+  test.each(cases)("%s", (name, exception, expected, errorArgs, infoArgs) => {
     const host = {} as ArgumentsHost;
     expect(filter.catch(exception, host)).toEqual(expected);
     if (errorArgs) {
-      expect(winstonErrorMock).toBeCalledTimes(1);
-      expect(winstonErrorMock).toBeCalledWith(...errorArgs);
+      expect(errorMock).toBeCalledTimes(1);
+      expect(errorMock).toBeCalledWith(...errorArgs);
     }
     if (infoArgs) {
-      expect(winstonInfoMock).toBeCalledTimes(1);
-      expect(winstonInfoMock).toBeCalledWith(...infoArgs);
+      expect(infoMock).toBeCalledTimes(1);
+      expect(infoMock).toBeCalledWith(...infoArgs);
     }
   });
 });
 
-describe('createRequestData', () => {
+describe("createRequestData", () => {
   const cases: Array<[string, any, RequestData]> = [
     [
-      'with user and body',
+      "with user and body",
       { ...EXAMPLE_REQUEST, body: EXAMPLE_BODY, user: EXAMPLE_USER },
       {
         query: EXAMPLE_QUERY,
         hostname: EXAMPLE_HOSTNAME,
         ip: EXAMPLE_IP,
-        userId: EXAMPLE_USER_ID
-      }
+        userId: EXAMPLE_USER_ID,
+      },
     ],
     [
-      'without body',
+      "without body",
       { ...EXAMPLE_REQUEST, user: EXAMPLE_USER },
       {
         query: undefined,
         hostname: EXAMPLE_HOSTNAME,
         ip: EXAMPLE_IP,
-        userId: EXAMPLE_USER_ID
-      }
+        userId: EXAMPLE_USER_ID,
+      },
     ],
     [
-      'without user',
+      "without user",
       { ...EXAMPLE_REQUEST, body: EXAMPLE_BODY },
       {
         query: EXAMPLE_QUERY,
         hostname: EXAMPLE_HOSTNAME,
         ip: EXAMPLE_IP,
-        userId: undefined
-      }
+        userId: undefined,
+      },
     ],
     [
-      'without user any body',
+      "without user any body",
       EXAMPLE_REQUEST,
       {
         hostname: EXAMPLE_HOSTNAME,
         ip: EXAMPLE_IP,
         query: undefined,
-        userId: undefined
-      }
-    ]
+        userId: undefined,
+      },
+    ],
   ];
-  test.each(cases)('%s', (name, req, expected) => {
+  test.each(cases)("%s", (name, req, expected) => {
     expect(createRequestData(req)).toEqual(expected);
   });
 });

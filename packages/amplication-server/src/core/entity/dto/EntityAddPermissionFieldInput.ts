@@ -1,10 +1,9 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { EnumEntityAction } from 'src/enums/EnumEntityAction';
-import { WhereParentIdInput } from 'src/dto';
+import { Field, InputType } from "@nestjs/graphql";
+import { EnumEntityAction } from "../../../enums/EnumEntityAction";
+import { WhereParentIdInput } from "../../../dto";
 
 @InputType({
   isAbstract: true,
-  description: undefined
 })
 export class EntityAddPermissionFieldInput {
   @Field(() => EnumEntityAction, { nullable: false })
@@ -12,13 +11,11 @@ export class EntityAddPermissionFieldInput {
 
   @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   fieldName: string;
 
   @Field(() => WhereParentIdInput, {
     nullable: false,
-    description: undefined
   })
   entity!: WhereParentIdInput;
 }

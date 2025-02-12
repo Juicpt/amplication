@@ -1,0 +1,11 @@
+@import "../style/index.scss";
+
+.back-navigation {
+  @include body2;
+  @include semiBold;
+  color: var(--gray-20);
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}

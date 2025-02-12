@@ -1,6 +1,6 @@
-import { ExecutionContext } from '@nestjs/common';
-import { GqlExecutionContext } from '@nestjs/graphql';
-import set from 'lodash.set';
+import { ExecutionContext } from "@nestjs/common";
+import { GqlExecutionContext } from "@nestjs/graphql";
+import { set } from "lodash";
 
 /**
  * Creates a mock implementation of GqlAuthGuard.canActivate with given user
@@ -13,12 +13,12 @@ import set from 'lodash.set';
  * }))
  */
 /* eslint-disable @typescript-eslint/ban-types */
-export const mockGqlAuthGuardCanActivate = (user: object) => (
-  executionContext: ExecutionContext
-): boolean => {
-  const gqlExecutionContext = GqlExecutionContext.create(executionContext);
-  const gqlContext = gqlExecutionContext.getContext();
-  // Set user for injectContextValue to work properly
-  set(gqlContext, ['req', 'user'], user);
-  return true;
-};
+export const mockGqlAuthGuardCanActivate =
+  (user: object) =>
+  (executionContext: ExecutionContext): boolean => {
+    const gqlExecutionContext = GqlExecutionContext.create(executionContext);
+    const gqlContext = gqlExecutionContext.getContext();
+    // Set user for injectContextValue to work properly
+    set(gqlContext, ["req", "user"], user);
+    return true;
+  };

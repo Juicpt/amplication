@@ -1,0 +1,31 @@
+@import "../../../../style/index.scss";
+
+.git-create-repo {
+  flex-direction: column;
+  &__header {
+    font-size: 14px;
+    margin-bottom: var(--large-spacing);
+    color: var(--gray-base);
+  }
+
+  &__button {
+    @include flexFullRowWithSpacing;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .text-input input {
+    max-width: unset;
+    width: 100%;
+  }
+
+  &__progress {
+    color: var(--gray-full) !important;
+  }
+
+  &__label {
+    color: var(--gray-20);
+    margin-bottom: var(--icon-spacing);
+    font-size: 10px;
+  }
+}

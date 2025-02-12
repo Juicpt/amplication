@@ -1,5 +1,5 @@
-import { ArgsType, Field } from '@nestjs/graphql';
-import { EntityFieldCreateInput } from './EntityFieldCreateInput';
+import { ArgsType, Field } from "@nestjs/graphql";
+import { EntityFieldCreateInput } from "./EntityFieldCreateInput";
 
 @ArgsType()
 export class CreateOneEntityFieldArgs {
@@ -11,4 +11,7 @@ export class CreateOneEntityFieldArgs {
 
   @Field(() => String, { nullable: true })
   relatedFieldDisplayName?: string;
+
+  @Field(() => Boolean, { nullable: true })
+  relatedFieldAllowMultipleSelection?: boolean;
 }

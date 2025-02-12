@@ -1,12 +1,26 @@
-import { GraphQLJSONObject } from 'graphql-type-json';
-import { JsonValue } from 'type-fest';
-import { ObjectType, Field } from '@nestjs/graphql';
-import { EnumActionLogLevel } from './EnumActionLogLevel';
+import { GraphQLJSONObject } from "graphql-type-json";
+import type { JsonValue } from "type-fest";
+import { ObjectType, Field } from "@nestjs/graphql";
+import { EnumActionLogLevel } from "./EnumActionLogLevel";
+
+const DEFAULT_VALUES: ActionLog = {
+  id: "",
+  createdAt: new Date(),
+  message: "",
+  meta: {},
+  level: EnumActionLogLevel.Info,
+};
 
 @ObjectType({
-  isAbstract: true
+  isAbstract: true,
 })
 export class ActionLog {
+  constructor(init?: Partial<ActionLog>) {
+    if (init) {
+      Object.assign(this, DEFAULT_VALUES, { createdAt: new Date() }, init);
+    }
+  }
+
   @Field(() => String, {})
   id!: string;
 

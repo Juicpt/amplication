@@ -1,50 +1,47 @@
-import { Field, InputType } from '@nestjs/graphql';
-import { SortOrder } from 'src/enums/SortOrder';
+import { Field, InputType } from "@nestjs/graphql";
+import { SortOrder } from "../../../enums/SortOrder";
 
 @InputType({
   isAbstract: true,
-  description: undefined
 })
 export class EntityOrderByInput {
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   id?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   createdAt?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   updatedAt?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   name?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   displayName?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
   })
   pluralDisplayName?: SortOrder | null;
 
   @Field(() => SortOrder, {
     nullable: true,
-    description: undefined
+  })
+  customAttributes?: SortOrder | null;
+
+  @Field(() => SortOrder, {
+    nullable: true,
   })
   description?: SortOrder | null;
 }

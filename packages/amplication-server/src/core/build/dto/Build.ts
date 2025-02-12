@@ -1,86 +1,74 @@
-import { ObjectType, Field } from '@nestjs/graphql';
-import { BlockVersion } from 'src/models/BlockVersion'; // eslint-disable-line import/no-cycle
-import { EntityVersion } from 'src/models/EntityVersion'; // eslint-disable-line import/no-cycle
-import { User } from 'src/models/User'; // eslint-disable-line import/no-cycle
-import { EnumBuildStatus } from './EnumBuildStatus';
-import { App, Commit } from 'src/models'; // eslint-disable-line import/no-cycle
-import { Action } from '../../action/dto/Action'; // eslint-disable-line import/no-cycle
-import { Deployment } from '../../deployment/dto/Deployment'; // eslint-disable-line import/no-cycle
-import { JsonValue } from 'type-fest';
+import { Field, ObjectType } from "@nestjs/graphql";
+import { Commit, Resource } from "../../../models";
+import { BlockVersion } from "../../../models/BlockVersion";
+import { EntityVersion } from "../../../models/EntityVersion";
+import { User } from "../../../models/User";
+import { Action } from "../../action/dto/Action";
+import { EnumBuildStatus } from "./EnumBuildStatus";
+import { EnumBuildGitStatus } from "./EnumBuildGitStatus";
 
 @ObjectType({
   isAbstract: true,
-  description: undefined
 })
 export class Build {
-  @Field(() => String, {
-    nullable: false,
-    description: undefined
-  })
+  @Field(() => String, { nullable: false })
   id!: string;
 
-  @Field(() => Date, {
-    nullable: false,
-    description: undefined
-  })
+  @Field(() => Date, { nullable: false })
   createdAt!: Date;
 
-  @Field(() => App)
-  app?: App;
+  @Field(() => Resource, { nullable: true })
+  resource?: Resource;
 
-  @Field(() => String)
-  appId!: string;
+  @Field(() => String, { nullable: false })
+  resourceId!: string;
 
-  @Field(() => User)
+  @Field(() => User, { nullable: true })
   createdBy?: User;
 
-  @Field(() => String, {
-    nullable: false,
-    description: undefined
-  })
+  @Field(() => String, { nullable: false })
   userId!: string;
 
-  @Field(() => EnumBuildStatus, {
-    nullable: true,
-    description: undefined
-  })
-  status?: keyof typeof EnumBuildStatus;
+  @Field(() => EnumBuildStatus, { nullable: false })
+  status: keyof typeof EnumBuildStatus;
 
-  @Field(() => String)
+  @Field(() => EnumBuildGitStatus, { nullable: false })
+  gitStatus: keyof typeof EnumBuildGitStatus;
+
+  @Field(() => String, { nullable: true })
   archiveURI?: string;
 
   blockVersions?: BlockVersion[] | null | undefined;
 
   entityVersions?: EntityVersion[] | null | undefined;
 
-  @Field(() => String, {
-    nullable: false
-  })
+  @Field(() => String, { nullable: false })
   version: string;
 
-  @Field(() => String)
+  @Field(() => String, { nullable: true })
   message?: string;
 
-  @Field(() => String)
+  @Field(() => String, { nullable: false })
   actionId: string;
 
-  @Field(() => Action, {
-    nullable: true
-  })
+  @Field(() => Action, { nullable: true })
   action?: Action;
 
-  @Field(() => [Deployment], {
-    nullable: true
-  })
-  deployments?: Deployment[];
-
-  containerStatusQuery?: JsonValue;
-  containerStatusUpdatedAt?: Date;
-  images?: string[];
-
-  @Field(() => Commit)
+  @Field(() => Commit, { nullable: true })
   commit?: Commit;
 
-  @Field(() => String)
+  @Field(() => String, { nullable: false })
   commitId!: string;
+
+  @Field(() => String, { nullable: true })
+  codeGeneratorVersion?: string;
+
+  @Field(() => Number, { nullable: true })
+  linesOfCodeAdded?: number;
+
+  @Field(() => Number, { nullable: true })
+  linesOfCodeDeleted?: number;
+
+  @Field(() => Number, { nullable: true })
+  filesChanged?: number;
 }

@@ -1,6 +1,6 @@
-import { ApolloClient, gql, NormalizedCacheObject } from '@apollo/client/core';
+import { ApolloClient, gql, NormalizedCacheObject } from "@apollo/client/core";
 
-import * as models from '../models';
+import * as models from "../models";
 
 const GET_FIELDS = gql`
   query getEntityFields(
@@ -10,7 +10,7 @@ const GET_FIELDS = gql`
   ) {
     entity(where: { id: $entityId }) {
       id
-      appId
+      resourceId
       fields(where: { displayName: $whereName }, orderBy: $orderBy) {
         id
         displayName

@@ -1,72 +1,31 @@
-import React, { useCallback } from "react";
+import React, { useContext } from "react";
 import * as models from "../models";
-import { useHistory } from "react-router-dom";
-
-import { UserAndTime, Panel, EnumPanelStyle } from "@amplication/design-system";
-
-import { ClickableId } from "../Components/ClickableId";
-
-import "./CommitListItem.scss";
-import { BuildStatusIcons } from "./BuildStatusIcons";
+import { AppContext } from "../context/appContext";
+import InnerTabLink from "../Layout/InnerTabLink";
+import CommitData from "./CommitData";
+import { useCommitStatus } from "./hooks/useCommitStatus";
+import { CommitBuildsStatusIcon } from "./CommitBuildsStatusIcon";
+import { FlexItem } from "@amplication/ui/design-system";
 
 type Props = {
-  applicationId: string;
+  projectId: string;
   commit: models.Commit;
 };
 
-export const CLASS_NAME = "commit-list-item";
-
-export const CommitListItem = ({ commit, applicationId }: Props) => {
-  const [build] = commit.builds;
-  const history = useHistory();
-
-  const handleBuildLinkClick = useCallback((event) => {
-    event.stopPropagation();
-  }, []);
-
-  const handleRowClick = useCallback(() => {
-    history.push(`/${applicationId}/commits/${commit.id}`);
-  }, [history, applicationId, commit]);
-
-  const account = commit.user?.account;
-
+export const CommitListItem = ({ commit, projectId }: Props) => {
+  const { currentWorkspace } = useContext(AppContext);
+  const { commitStatus } = useCommitStatus(commit);
   return (
-    <Panel
-      className={CLASS_NAME}
-      clickable
-      onClick={handleRowClick}
-      panelStyle={EnumPanelStyle.Bordered}
+    <InnerTabLink
+      icon=""
+      to={`/${currentWorkspace?.id}/${projectId}/commits/${commit.id}`}
     >
-      <div className={`${CLASS_NAME}__row`}>
-        <ClickableId
-          className={`${CLASS_NAME}__title`}
-          id={commit.id}
-          label=""
-          to={`/${applicationId}/commit/${commit.id}`}
-          eventData={{
-            eventName: "commitListCommitIdClick",
-          }}
-        />
-        <span className="spacer" />
-        {build && (
-          <ClickableId
-            className={`${CLASS_NAME}__build`}
-            label="Build ID"
-            to={`/${applicationId}/builds/${build.id}`}
-            id={build.id}
-            onClick={handleBuildLinkClick}
-            eventData={{
-              eventName: "commitListBuildIdClick",
-            }}
-          />
-        )}
-        <UserAndTime account={account} time={commit.createdAt} />
-      </div>
-      <div className={`${CLASS_NAME}__row`}>
-        <span className={`${CLASS_NAME}__description`}>{commit.message}</span>
-        <span className="spacer" />
-        <BuildStatusIcons build={build} />
-      </div>
-    </Panel>
+      <FlexItem>
+        <CommitData commit={commit} />
+        <FlexItem.FlexEnd minWidthAuto={true}>
+          <CommitBuildsStatusIcon commitBuildStatus={commitStatus} />
+        </FlexItem.FlexEnd>
+      </FlexItem>
+    </InnerTabLink>
   );
 };

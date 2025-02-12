@@ -9,10 +9,11 @@ import {
   TextField,
   Snackbar,
   CircularProgress,
-} from "@amplication/design-system";
+} from "@amplication/ui/design-system";
 import { Button } from "../Components/Button";
 import { SIGN_IN_PAGE_CONTENT, DEFAULT_PAGE_SOURCE } from "../User/constants";
 import "./Signup.scss";
+import { LOCAL_STORAGE_KEY_INVITATION_TOKEN } from "../App";
 
 type Values = {
   email: string;
@@ -57,10 +58,14 @@ const Signup = () => {
 
   useEffect(() => {
     if (data) {
+      const isFromInvitation = localStorage.getItem(
+        LOCAL_STORAGE_KEY_INVITATION_TOKEN
+      );
       setToken(data.signup.token);
-      // @ts-ignore
-      const { from } = location.state || { from: { pathname: "/create-app" } };
-      history.replace(from);
+      history.push({
+        pathname: "/",
+        search: isFromInvitation ? "" : "complete-signup=1",
+      });
     }
   }, [data, history, location]);
 
@@ -117,7 +122,7 @@ const Signup = () => {
           <p className={`${CLASS_NAME}__signup`}>
             Already have an account? <Link to="/login">Sign In</Link>
           </p>
-          {loading && <CircularProgress />}
+          {loading && <CircularProgress centerToParent />}
           <Snackbar open={Boolean(error)} message={errorMessage} />
         </Form>
       </Formik>

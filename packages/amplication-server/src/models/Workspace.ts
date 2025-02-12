@@ -1,43 +1,48 @@
-import { Field, ObjectType } from '@nestjs/graphql';
-import { User } from './User'; // eslint-disable-line import/no-cycle
-import { App } from './App'; // eslint-disable-line import/no-cycle
-import { GitOrganization } from './GitOrganization';
+import { Field, ObjectType } from "@nestjs/graphql";
+import { User } from "./User";
+import { GitOrganization } from "./GitOrganization";
+import { Project } from "./Project";
 
 @ObjectType({
   isAbstract: true,
-  description: undefined
 })
 export class Workspace {
   @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   id!: string;
 
   @Field(() => Date, {
     nullable: false,
-    description: undefined
   })
   createdAt!: Date;
 
   @Field(() => Date, {
     nullable: false,
-    description: undefined
   })
   updatedAt!: Date;
 
   @Field(() => String, {
     nullable: false,
-    description: undefined
   })
   name!: string;
 
-  @Field(() => [App])
-  apps?: App[];
+  @Field(() => Boolean, {
+    nullable: false,
+  })
+  allowLLMFeatures!: boolean;
+
+  @Field(() => [Project])
+  projects?: Project[];
 
   @Field(() => [GitOrganization], { nullable: true })
   gitOrganizations?: GitOrganization[];
 
   @Field(() => [User])
   users?: User[];
+
+  @Field(() => String, {
+    nullable: true,
+  })
+  externalId?: string;
 }

@@ -1,26 +1,28 @@
-import React, { useCallback, useContext } from "react";
-import { Switch, match, useLocation } from "react-router-dom";
-import { gql, useQuery, useMutation } from "@apollo/client";
-import { Snackbar } from "@amplication/design-system";
-import PendingChangesContext from "../VersionControl/PendingChangesContext";
-import * as models from "../models";
-import { formatError } from "../util/error";
-import PageContent from "../Layout/PageContent";
-import EntityForm from "./EntityForm";
-import { EntityFieldLinkList } from "./EntityFieldLinkList";
-import { EntityFieldList } from "./EntityFieldList";
+import { CircularProgress, Snackbar } from "@amplication/ui/design-system";
+import { gql, useMutation, useQuery } from "@apollo/client";
+import { useCallback, useContext } from "react";
+import { Switch, match } from "react-router-dom";
 import EntityField from "../Entity/EntityField";
-import PermissionsForm from "../Permissions/PermissionsForm";
-import { ENTITY_ACTIONS } from "./constants";
-import useNavigationTabs from "../Layout/UseNavigationTabs";
-import { useTracking, track } from "../util/analytics";
 import InnerTabLink from "../Layout/InnerTabLink";
+import PageContent from "../Layout/PageContent";
 import RouteWithAnalytics from "../Layout/RouteWithAnalytics";
+import PermissionsForm from "../Permissions/PermissionsForm";
+import * as models from "../models";
+import { track } from "../util/analytics";
+import { formatError } from "../util/error";
+import { EntityFieldLinkList } from "./EntityFieldLinkList";
+import EntityFieldList from "./EntityFieldList";
+import EntityForm from "./EntityForm";
+import { ENTITY_ACTIONS } from "./constants";
 
-import "./Entity.scss";
+import { AppContext } from "../context/appContext";
+import useModule from "../Modules/hooks/useModule";
+import { DATE_CREATED_FIELD } from "../Modules/ModuleNavigationList";
+import useBreadcrumbs from "../Layout/useBreadcrumbs";
+import { useResourceBaseUrl } from "../util/useResourceBaseUrl";
 
 type Props = {
-  match: match<{ application: string; entityId: string; fieldId: string }>;
+  match: match<{ resource: string; entityId: string; fieldId: string }>;
 };
 
 type TData = {
@@ -30,13 +32,19 @@ type TData = {
 type UpdateData = {
   updateEntity: models.Entity;
 };
-const NAVIGATION_KEY = "ENTITY";
+
+const RESOURCE_BASE_PATH = "/:workspace/:project/:resource";
+const PLATFORM_RESOURCE_BASE_PATH = "/:workspace/platform/:project/:resource";
 
 const Entity = ({ match }: Props) => {
-  const { entityId, application } = match.params;
-  const { trackEvent } = useTracking();
-  const pendingChangesContext = useContext(PendingChangesContext);
-  const location = useLocation();
+  const { entityId, resource } = match.params;
+  const { addEntity } = useContext(AppContext);
+
+  const { baseUrl, isPlatformConsole } = useResourceBaseUrl({
+    overrideResourceId: resource,
+  });
+
+  const { findModuleRefetch } = useModule();
 
   const { data, loading, error } = useQuery<TData>(GET_ENTITY, {
     variables: {
@@ -44,22 +52,21 @@ const Entity = ({ match }: Props) => {
     },
   });
 
-  useNavigationTabs(
-    application,
-    `${NAVIGATION_KEY}_${entityId}`,
-    location.pathname,
-    data?.entity.displayName
-  );
-
   const [updateEntity, { error: updateError }] = useMutation<UpdateData>(
     UPDATE_ENTITY,
     {
       onCompleted: (data) => {
-        trackEvent({
-          eventName: "updateEntity",
-          entityName: data.updateEntity.displayName,
+        //refresh the modules list
+        findModuleRefetch({
+          where: {
+            resource: { id: resource },
+          },
+          orderBy: {
+            [DATE_CREATED_FIELD]: models.SortOrder.Asc,
+          },
         });
-        pendingChangesContext.addEntity(data.updateEntity.id);
+
+        addEntity(data.updateEntity.id);
       },
     }
   );
@@ -68,7 +75,7 @@ const Entity = ({ match }: Props) => {
     (data: Omit<models.Entity, "versionNumber">) => {
       /**@todo: check why the "fields" and "permissions" properties are not removed by omitDeep in the form */
 
-      let {
+      const {
         id,
         fields, // eslint-disable-line @typescript-eslint/no-unused-vars
         permissions, // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -92,26 +99,33 @@ const Entity = ({ match }: Props) => {
 
   const errorMessage = formatError(error || updateError);
 
+  const basePath = isPlatformConsole
+    ? PLATFORM_RESOURCE_BASE_PATH
+    : RESOURCE_BASE_PATH;
+
+  useBreadcrumbs(data?.entity.name, match.url);
+
   return (
     <PageContent
+      pageTitle={data?.entity.displayName}
       className="entity"
       sideContent={
         data && (
           <>
             <InnerTabLink
-              to={`/${application}/entities/${data.entity.id}`}
+              to={`${baseUrl}/entities/${data.entity.id}`}
               icon="settings"
             >
               General Settings
             </InnerTabLink>
             <InnerTabLink
-              to={`/${application}/entities/${data.entity.id}/permissions`}
+              to={`${baseUrl}/entities/${data.entity.id}/permissions`}
               icon="lock"
             >
               Permissions
             </InnerTabLink>
             <InnerTabLink
-              to={`/${application}/entities/${data.entity.id}/fields`}
+              to={`${baseUrl}/entities/${data.entity.id}/fields`}
               icon="option_set"
             >
               Fields
@@ -124,29 +138,37 @@ const Entity = ({ match }: Props) => {
       }
     >
       {loading ? (
-        <span>Loading...</span>
+        <CircularProgress centerToParent />
       ) : !data ? (
         <span>can't find</span> /**@todo: Show formatted error message */
       ) : (
         <Switch>
-          <RouteWithAnalytics path="/:application/entities/:entityId/permissions">
+          <RouteWithAnalytics
+            path={`${basePath}/entities/:entityId/permissions`}
+          >
             <PermissionsForm
               entityId={entityId}
-              applicationId={application}
+              entityName={data.entity.name}
+              resourceId={resource}
               availableActions={ENTITY_ACTIONS}
               objectDisplayName={data.entity.pluralDisplayName}
             />
           </RouteWithAnalytics>
-          <RouteWithAnalytics path="/:application/entities/:entityId/fields/:fieldId">
+          <RouteWithAnalytics
+            path={`${basePath}/entities/:entityId/fields/:fieldId`}
+          >
             <EntityField />
           </RouteWithAnalytics>
-          <RouteWithAnalytics path="/:application/entities/:entityId/fields/">
-            <EntityFieldList entityId={data.entity.id} />
+          <RouteWithAnalytics path={`${basePath}/entities/:entityId/fields/`}>
+            <EntityFieldList
+              entityId={data.entity.id}
+              entityName={data.entity.name}
+            />
           </RouteWithAnalytics>
-          <RouteWithAnalytics path="/:application/entities/:entityId">
+          <RouteWithAnalytics path={`${basePath}/entities/:entityId`}>
             <EntityForm
               entity={data.entity}
-              applicationId={application}
+              resourceId={resource}
               onSubmit={handleSubmit}
             />
           </RouteWithAnalytics>
@@ -171,6 +193,7 @@ export const GET_ENTITY = gql`
       name
       displayName
       pluralDisplayName
+      customAttributes
       description
       lockedAt
       lockedByUser {
@@ -186,6 +209,7 @@ export const GET_ENTITY = gql`
         unique
         required
         searchable
+        customAttributes
         dataType
         description
       }
@@ -200,6 +224,7 @@ const UPDATE_ENTITY = gql`
       name
       displayName
       pluralDisplayName
+      customAttributes
       description
       lockedAt
       lockedByUser {
@@ -215,6 +240,7 @@ const UPDATE_ENTITY = gql`
         required
         unique
         searchable
+        customAttributes
         dataType
         description
       }

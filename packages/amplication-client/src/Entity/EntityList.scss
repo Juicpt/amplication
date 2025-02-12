@@ -1,16 +1,31 @@
 @import "../style/index.scss";
 
 .entity-list {
-  &__header {
-    @include flexFullRowWithSpacing;
-    margin-bottom: var(--large-spacing);
-
-    .search-field {
-      width: var(--form-field-long);
+  &__view-toggle {
+    .toggle-field {
+      border: $border-dark;
+      border-radius: 20px;
+      .MuiSwitch-root {
+        border-radius: 8px;
+        .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track {
+          background-color: var(--gray-full);
+        }
+        .MuiSwitch-switchBase:not(.Mui-checked) + .MuiSwitch-track {
+          background-color: var(--gray-full);
+        }
+      }
     }
   }
-  &__title {
-    @include body2;
-    margin-bottom: var(--large-spacing);
+
+  .search-field {
+    max-width: 120px;
+  }
+}
+
+.workspaces-layout__main_content--xl {
+  .entity-list {
+    .search-field {
+      max-width: none;
+    }
   }
 }

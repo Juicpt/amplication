@@ -1,38 +1,61 @@
-import React from "react";
 import { capitalCase } from "capital-case";
-import { ToggleField, TextField } from "@amplication/design-system";
+import {
+  ToggleField,
+  TextField,
+  OptionItem,
+  SelectField,
+} from "@amplication/ui/design-system";
 import EntitySelectField from "../Components/EntitySelectField";
-import EnumSelectField from "../Components/EnumSelectField";
 import RelatedEntityFieldField from "./RelatedEntityFieldField";
 import RelationAllowMultipleField from "../Components/RelationAllowMultipleField";
-import { Schema } from "@amplication/data";
+import { Schema } from "@amplication/code-gen-types";
 import OptionSet from "../Entity/OptionSet";
+import { JSONSchema7 } from "json-schema";
+import RelationFkHolderField from "./RelationFkHolderField";
+import * as models from "../models";
+import { useMemo } from "react";
+import { ENTITY_FIELD_ENUM_MAPPER } from "./constants";
 
-export const SchemaField = ({
-  propertyName,
-  propertySchema,
-  isDisabled,
-  applicationId,
-  entityDisplayName,
-}: {
+type Props = {
+  fieldDataType: models.EnumDataType;
   propertyName: string;
   propertySchema: Schema;
   isDisabled?: boolean;
-  applicationId: string;
-  entityDisplayName: string;
-}) => {
+  resourceId: string;
+  entity: models.Entity;
+  isSystemData?: boolean;
+};
+
+export const SchemaField = ({
+  fieldDataType,
+  propertyName,
+  propertySchema,
+  resourceId,
+  entity,
+}: Props) => {
   const fieldName = `properties.${propertyName}`;
   const label = propertySchema.title || capitalCase(propertyName);
+
+  const enumOptions = useMemo((): OptionItem[] | null => {
+    if (propertySchema.enum) {
+      return (propertySchema.enum as string[]).map((item) => {
+        const labelByItem: { label: string; value: string } =
+          ENTITY_FIELD_ENUM_MAPPER[fieldDataType][propertyName].find(
+            (option) => option.value === item
+          );
+
+        return {
+          value: item,
+          label: labelByItem.label || item,
+        };
+      });
+    } else return null;
+  }, [fieldDataType, propertyName, propertySchema]);
 
   if (propertySchema.enum) {
     if (propertySchema.enum.every((item) => typeof item === "string")) {
       return (
-        <EnumSelectField
-          label={label}
-          name={fieldName}
-          disabled={isDisabled}
-          options={propertySchema.enum as string[]}
-        />
+        <SelectField label={label} name={fieldName} options={enumOptions} />
       );
     } else {
       throw new Error(
@@ -43,33 +66,35 @@ export const SchemaField = ({
 
   switch (propertySchema.type) {
     case "string": {
-      return <TextField name={fieldName} label={label} disabled={isDisabled} />;
+      return <TextField name={fieldName} label={label} />;
     }
     case "integer":
     case "number": {
-      return (
-        <TextField
-          type="number"
-          name={fieldName}
-          label={label}
-          disabled={isDisabled}
-        />
-      );
+      return <TextField type="number" name={fieldName} label={label} />;
     }
     case "boolean": {
-      return (
-        <ToggleField name={fieldName} label={label} disabled={isDisabled} />
-      );
+      return <ToggleField name={fieldName} label={label} />;
     }
     case "array": {
       if (!propertySchema.items) {
         throw new Error("Array schema must define items");
       }
 
-      switch (propertySchema.items.type) {
+      switch ((propertySchema.items as JSONSchema7).type) {
         case "object": {
+          return <OptionSet label={label} name={fieldName} />;
+        }
+        case "string": {
           return (
-            <OptionSet label={label} name={fieldName} isDisabled={isDisabled} />
+            <SelectField
+              label={label}
+              name={fieldName}
+              // If enumOptions is null, options will be an empty array and will allow the user to create new options
+              options={enumOptions || []}
+              isMulti
+              isClearable
+              isCreatable={enumOptions === null}
+            />
           );
         }
         default: {
@@ -86,22 +111,30 @@ export const SchemaField = ({
             <EntitySelectField
               label={label}
               name={fieldName}
-              disabled={isDisabled}
-              applicationId={applicationId}
+              resourceId={resourceId}
+              isValueId
+            />
+          );
+        }
+        case "#/definitions/RelationFkHolder": {
+          return (
+            <RelationFkHolderField
+              entity={entity}
+              label={label}
+              name={fieldName}
             />
           );
         }
         case "#/definitions/EntityFieldId": {
           return (
-            <RelatedEntityFieldField entityDisplayName={entityDisplayName} />
+            <RelatedEntityFieldField entityDisplayName={entity.displayName} />
           );
         }
         case "#/definitions/RelationAllowMultiple": {
           return (
             <RelationAllowMultipleField
               fieldName={fieldName}
-              isDisabled={isDisabled}
-              entityDisplayName={entityDisplayName}
+              entityDisplayName={entity.displayName}
             />
           );
         }

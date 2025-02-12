@@ -1,121 +1,135 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { useHistory } from "react-router-dom";
-import { isEmpty } from "lodash";
-import { gql, useQuery } from "@apollo/client";
-import { formatError } from "../util/error";
-import * as models from "../models";
 import {
+  Chip,
+  CircularProgress,
+  EnumChipStyle,
+  EnumFlexDirection,
+  EnumItemsAlign,
+  EnumTextStyle,
+  FlexItem,
+  HorizontalRule,
+  Icon,
+  List,
+  ListItem,
   SearchField,
   Snackbar,
-  CircularProgress,
-} from "@amplication/design-system";
+  TabContentTitle,
+  Text,
+} from "@amplication/ui/design-system";
+import React, { useCallback } from "react";
+import { useHistory } from "react-router-dom";
+import { useAppContext } from "../context/appContext";
+import * as models from "../models";
+import { formatError } from "../util/error";
+import { pluralize } from "../util/pluralize";
+import useRoles from "./hooks/useRoles";
 import NewRole from "./NewRole";
-import InnerTabLink from "../Layout/InnerTabLink";
-import "./RoleList.scss";
+import BetaFeatureTag from "../Components/BetaFeatureTag";
 
-type TData = {
-  appRoles: models.AppRole[];
-};
-
-const DATE_CREATED_FIELD = "createdAt";
 const CLASS_NAME = "role-list";
 
-type Props = {
-  applicationId: string;
-  selectFirst?: boolean;
-};
+export const RoleList = React.memo(() => {
+  const { currentWorkspace, permissions } = useAppContext();
 
-export const RoleList = React.memo(
-  ({ applicationId, selectFirst = false }: Props) => {
-    const [searchPhrase, setSearchPhrase] = useState<string>("");
+  const canCreate = permissions.canPerformTask("role.create");
 
-    const handleSearchChange = useCallback(
-      (value) => {
-        setSearchPhrase(value);
-      },
-      [setSearchPhrase]
-    );
-    const history = useHistory();
+  const baseUrl = `/${currentWorkspace?.id}/settings`;
 
-    const { data, loading, error } = useQuery<TData>(GET_ROLES, {
-      variables: {
-        id: applicationId,
-        orderBy: {
-          [DATE_CREATED_FIELD]: models.SortOrder.Asc,
-        },
-        whereName:
-          searchPhrase !== ""
-            ? {
-                contains: searchPhrase,
-                mode: models.QueryMode.Insensitive,
-              }
-            : undefined,
-      },
-    });
+  const {
+    setSearchPhrase,
+    findRolesData: data,
+    findRolesError: error,
+    findRolesLoading: loading,
+  } = useRoles();
 
-    const errorMessage = formatError(error);
+  const handleSearchChange = useCallback(
+    (value) => {
+      setSearchPhrase(value);
+    },
+    [setSearchPhrase]
+  );
+  const history = useHistory();
 
-    const handleRoleChange = useCallback(
-      (role: models.AppRole) => {
-        const fieldUrl = `/${applicationId}/roles/${role.id}`;
-        history.push(fieldUrl);
-      },
-      [history, applicationId]
-    );
+  const errorMessage = formatError(error);
 
-    useEffect(() => {
-      if (selectFirst && data && !isEmpty(data.appRoles)) {
-        console.log("role list effect - inside");
-        const role = data.appRoles[0];
-        const fieldUrl = `/${applicationId}/roles/${role.id}`;
-        history.push(fieldUrl);
-      }
-    }, [data, selectFirst, applicationId, history]);
+  const handleRoleChange = useCallback(
+    (role: models.Role) => {
+      const fieldUrl = `${baseUrl}/roles/${role.id}`;
+      history.push(fieldUrl);
+    },
+    [history, baseUrl]
+  );
 
-    return (
-      <div className={CLASS_NAME}>
-        <SearchField
-          label="search"
-          placeholder="search"
-          onChange={handleSearchChange}
-        />
-        <div className={`${CLASS_NAME}__header`}>
-          {data?.appRoles.length} Roles
-        </div>
+  return (
+    <div className={CLASS_NAME}>
+      <TabContentTitle title="Roles" />
+
+      <FlexItem
+        itemsAlign={EnumItemsAlign.End}
+        end={
+          <FlexItem itemsAlign={EnumItemsAlign.Center}>
+            <BetaFeatureTag
+              children="
+              Roles are still in beta. Some features may be missing or incomplete.
+              For complete functionality, please use the default Admin role ."
+            />
+
+            <SearchField
+              label="search"
+              placeholder="search"
+              onChange={handleSearchChange}
+            />
+          </FlexItem>
+        }
+      >
+        <Text textStyle={EnumTextStyle.Tag}>
+          {data?.roles.length || "0"}{" "}
+          {pluralize(data?.roles.length, "Role", "Roles")}
+        </Text>
         {loading && <CircularProgress />}
-        {data?.appRoles?.map((role) => (
-          <div key={role.id}>
-            <InnerTabLink
-              icon="roles"
-              to={`/${applicationId}/roles/${role.id}`}
-            >
-              <span>{role.displayName}</span>
-            </InnerTabLink>
-          </div>
-        ))}
-        {data?.appRoles && (
-          <NewRole onRoleAdd={handleRoleChange} applicationId={applicationId} />
-        )}
-        <Snackbar open={Boolean(error)} message={errorMessage} />
-      </div>
-    );
-  }
-);
+      </FlexItem>
 
-export const GET_ROLES = gql`
-  query getRoles(
-    $id: String!
-    $orderBy: AppRoleOrderByInput
-    $whereName: StringFilter
-  ) {
-    appRoles(
-      where: { app: { id: $id }, displayName: $whereName }
-      orderBy: $orderBy
-    ) {
-      id
-      name
-      displayName
-      description
-    }
-  }
-`;
+      <HorizontalRule />
+
+      <List
+        headerContent={
+          canCreate && (
+            <NewRole disabled={!data?.roles} onRoleAdd={handleRoleChange} />
+          )
+        }
+      >
+        {data?.roles?.map((role) => (
+          <ListItem
+            to={`${baseUrl}/roles/${role.id}`}
+            start={<Icon icon="roles_outline" />}
+          >
+            <FlexItem
+              singeChildWithEllipsis
+              itemsAlign={EnumItemsAlign.Center}
+              end={
+                <FlexItem
+                  direction={EnumFlexDirection.Row}
+                  itemsAlign={EnumItemsAlign.Center}
+                >
+                  {role.permissions.includes("*") && (
+                    <Chip chipStyle={EnumChipStyle.ThemeBlue}>Admin</Chip>
+                  )}
+                  <Text textStyle={EnumTextStyle.Description}>
+                    {role.permissions.length}{" "}
+                    {pluralize(
+                      role.permissions.length,
+                      "Permission",
+                      "Permissions"
+                    )}
+                  </Text>
+                </FlexItem>
+              }
+            >
+              <Text textStyle={EnumTextStyle.Description}>{role.name}</Text>
+            </FlexItem>
+          </ListItem>
+        ))}
+      </List>
+      <Snackbar open={Boolean(error)} message={errorMessage} />
+    </div>
+  );
+});

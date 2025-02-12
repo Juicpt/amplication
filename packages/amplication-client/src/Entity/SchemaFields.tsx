@@ -1,19 +1,20 @@
-import React from "react";
 import { SchemaField } from "./SchemaField";
-import { Schema } from "@amplication/data";
+import { Schema } from "@amplication/code-gen-types";
+import * as models from "../models";
 
 type Props = {
   schema: Schema;
+  entity: models.Entity;
+  fieldDataType: models.EnumDataType;
+  resourceId: string;
   isDisabled?: boolean;
-  applicationId: string;
-  entityDisplayName: string;
 };
 
 export const SchemaFields = ({
   schema,
-  isDisabled,
-  applicationId,
-  entityDisplayName,
+  resourceId,
+  entity,
+  fieldDataType,
 }: Props) => {
   if (schema === null) {
     return null;
@@ -32,11 +33,11 @@ export const SchemaFields = ({
         return (
           <div key={name}>
             <SchemaField
+              fieldDataType={fieldDataType}
               propertyName={name}
               propertySchema={property as Schema}
-              isDisabled={isDisabled}
-              applicationId={applicationId}
-              entityDisplayName={entityDisplayName}
+              resourceId={resourceId}
+              entity={entity}
             />
           </div>
         );

@@ -1,0 +1,11 @@
+@import "../../style/index.scss";
+
+.amp-tooltip {
+  .MuiTooltip-tooltip {
+    background-color: var(--tooltip-background);
+  }
+
+  .MuiTooltip-arrow {
+    color: var(--tooltip-background);
+  }
+}

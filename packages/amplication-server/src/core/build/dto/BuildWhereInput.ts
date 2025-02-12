@@ -1,42 +1,54 @@
-import { InputType, Field } from '@nestjs/graphql';
-import { WhereUniqueInput, DateTimeFilter, StringFilter } from 'src/dto';
+import { InputType, Field } from "@nestjs/graphql";
+import { WhereUniqueInput, DateTimeFilter, StringFilter } from "../../../dto";
+import { EnumBuildGitStatusFilter } from "./EnumBuildGitStatusFilter";
+import { EnumBuildStatusFilter } from "./EnumBuildStatusFilter";
 
 @InputType({
-  isAbstract: true
+  isAbstract: true,
 })
 export class BuildWhereInput {
   @Field(() => StringFilter, {
-    nullable: true
+    nullable: true,
   })
   id?: StringFilter | null | undefined;
 
   @Field(() => DateTimeFilter, {
-    nullable: true
+    nullable: true,
   })
   createdAt?: DateTimeFilter | null | undefined;
 
-  @Field(() => WhereUniqueInput)
-  app?: WhereUniqueInput;
+  @Field(() => WhereUniqueInput, {
+    nullable: true,
+  })
+  resource?: WhereUniqueInput;
 
   @Field(() => WhereUniqueInput, {
-    nullable: true
+    nullable: true,
   })
   createdBy?: WhereUniqueInput | null | undefined;
 
   @Field(() => StringFilter, {
     nullable: true,
-    description: undefined
   })
   version?: StringFilter | null;
 
   @Field(() => StringFilter, {
     nullable: true,
-    description: undefined
   })
   message?: StringFilter | null;
 
   @Field(() => WhereUniqueInput, {
-    nullable: true
+    nullable: true,
   })
   commit?: WhereUniqueInput;
+
+  @Field(() => EnumBuildStatusFilter, {
+    nullable: true,
+  })
+  status?: EnumBuildStatusFilter | null;
+
+  @Field(() => EnumBuildGitStatusFilter, {
+    nullable: true,
+  })
+  gitStatus?: EnumBuildGitStatusFilter | null;
 }

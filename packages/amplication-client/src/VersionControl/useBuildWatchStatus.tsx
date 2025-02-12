@@ -1,26 +1,23 @@
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { gql, useQuery } from "@apollo/client";
 
 import * as models from "../models";
+import { AppContext } from "../context/appContext";
 
 const POLL_INTERVAL = 5000;
 /**
  * Pulls updates of the build from the server as long as the build process is still active
  */
 const useBuildWatchStatus = (
-  build: models.Build
-): { data: { build: models.Build } } => {
-  const { data, startPolling, stopPolling } = useQuery<{
+  build?: models.Build
+): { data: { build?: models.Build } } => {
+  const { commitUtils } = useContext(AppContext);
+
+  const { data, startPolling, stopPolling, refetch } = useQuery<{
     build: models.Build;
   }>(GET_BUILD, {
-    onCompleted: () => {
-      //Start polling if build process is still running
-      if (shouldReload(build)) {
-        startPolling(POLL_INTERVAL);
-      }
-    },
     variables: {
-      buildId: build.id,
+      buildId: build?.id,
     },
     skip: !shouldReload(build),
   });
@@ -32,7 +29,13 @@ const useBuildWatchStatus = (
     } else {
       startPolling(POLL_INTERVAL);
     }
-  }, [data, stopPolling, startPolling]);
+    //update the build status in the commit for every change
+    data && commitUtils.updateBuildStatus(data.build);
+  }, [data, stopPolling, startPolling, commitUtils]);
+
+  useEffect(() => {
+    if (build) refetch();
+  }, [build]);
 
   //cleanup polling
   useEffect(() => {
@@ -47,21 +50,7 @@ const useBuildWatchStatus = (
 export default useBuildWatchStatus;
 
 function shouldReload(build: models.Build | undefined): boolean {
-  return (
-    (build &&
-      (build.status === models.EnumBuildStatus.Running ||
-        build.deployments?.some(
-          (deployment) =>
-            deployment.status === models.EnumDeploymentStatus.Waiting
-        ) ||
-        (build.deployments?.length &&
-          build.deployments[0].action?.steps?.some(
-            (step) =>
-              step.status === models.EnumActionStepStatus.Running ||
-              step.status === models.EnumActionStepStatus.Waiting
-          )))) ||
-    false
-  );
+  return (build && build?.status === models.EnumBuildStatus.Running) || false;
 }
 
 export const GET_BUILD = gql`
@@ -69,7 +58,7 @@ export const GET_BUILD = gql`
     build(where: { id: $buildId }) {
       id
       createdAt
-      appId
+      resourceId
       version
       message
       createdAt
@@ -103,38 +92,6 @@ export const GET_BUILD = gql`
       }
       status
       archiveURI
-      deployments(orderBy: { createdAt: Desc }, take: 1) {
-        id
-        buildId
-        createdAt
-        status
-        actionId
-        action {
-          id
-          createdAt
-          steps {
-            id
-            name
-            createdAt
-            message
-            status
-            completedAt
-            logs {
-              id
-              createdAt
-              message
-              meta
-              level
-            }
-          }
-        }
-        message
-        environment {
-          id
-          name
-          address
-        }
-      }
     }
   }
 `;

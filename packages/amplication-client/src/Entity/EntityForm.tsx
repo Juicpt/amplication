@@ -1,23 +1,30 @@
 import React, { useMemo } from "react";
 import { Formik } from "formik";
-
-import omitDeep from "deepdash-es/omitDeep";
-
 import * as models from "../models";
-import { TextField } from "@amplication/design-system";
+import {
+  TabContentTitle,
+  TextField,
+  Form,
+} from "@amplication/ui/design-system";
 import { DisplayNameField } from "../Components/DisplayNameField";
 import NameField from "../Components/NameField";
-import { Form } from "../Components/Form";
 import FormikAutoSave from "../util/formikAutoSave";
-import { USER_ENTITY } from "./constants";
-import { validate } from "../util/formikValidateJsonSchema";
+import {
+  validate,
+  validationErrorMessages,
+} from "../util/formikValidateJsonSchema";
 import { isEqual } from "../util/customValidations";
+import useResource from "../Resource/hooks/useResource";
+
+// This must be here unless we get rid of deepdash as it does not support ES imports
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const omitDeep = require("deepdash/omitDeep");
 
 type EntityInput = Omit<models.Entity, "fields" | "versionNumber">;
 
 type Props = {
   entity?: models.Entity;
-  applicationId: string;
+  resourceId: string;
   onSubmit: (entity: EntityInput) => void;
 };
 
@@ -32,6 +39,8 @@ const NON_INPUT_GRAPHQL_PROPERTIES = [
   "lockedByUserId",
   "__typename",
 ];
+
+const { AT_LEAST_TWO_CHARACTERS } = validationErrorMessages;
 
 const FORM_SCHEMA = {
   required: ["name", "displayName", "pluralDisplayName"],
@@ -49,6 +58,13 @@ const FORM_SCHEMA = {
       minLength: 2,
     },
   },
+  errorMessage: {
+    properties: {
+      displayName: AT_LEAST_TWO_CHARACTERS,
+      name: AT_LEAST_TWO_CHARACTERS,
+      pluralDisplayName: AT_LEAST_TWO_CHARACTERS,
+    },
+  },
 };
 
 const EQUAL_PLURAL_DISPLAY_NAME_AND_NAME_TEXT =
@@ -56,7 +72,8 @@ const EQUAL_PLURAL_DISPLAY_NAME_AND_NAME_TEXT =
 
 const CLASS_NAME = "entity-form";
 
-const EntityForm = React.memo(({ entity, applicationId, onSubmit }: Props) => {
+const EntityForm = React.memo(({ entity, resourceId, onSubmit }: Props) => {
+  const { serviceSettings } = useResource(resourceId);
   const initialValues = useMemo(() => {
     const sanitizedDefaultValues = omitDeep(
       {
@@ -69,6 +86,7 @@ const EntityForm = React.memo(({ entity, applicationId, onSubmit }: Props) => {
 
   return (
     <div className={CLASS_NAME}>
+      <TabContentTitle title="Entity Settings" subTitle="" />
       <Formik
         initialValues={initialValues}
         validate={(values) => {
@@ -92,7 +110,10 @@ const EntityForm = React.memo(({ entity, applicationId, onSubmit }: Props) => {
 
                 <NameField
                   name="name"
-                  disabled={USER_ENTITY === entity?.name}
+                  disabled={
+                    serviceSettings?.serviceSettings?.authEntityName ===
+                    entity?.name
+                  }
                   capitalized
                 />
                 <TextField
@@ -102,9 +123,31 @@ const EntityForm = React.memo(({ entity, applicationId, onSubmit }: Props) => {
                 <TextField
                   autoComplete="off"
                   textarea
+                  textareaSize="small"
                   rows={3}
                   name="description"
                   label="Description"
+                />
+                <TextField
+                  autoComplete="off"
+                  placeholder="Custom Prisma attributes"
+                  inputToolTip={{
+                    content: (
+                      <span>
+                        Add custom attributes to model using the format
+                        @@attribute([parameters]) or @@attribute().
+                        <br />
+                        <br /> For example:
+                        <br />
+                        @@index([field_1, field_2]) <br />
+                        @@map("modelName")
+                      </span>
+                    ),
+                  }}
+                  textarea
+                  rows={3}
+                  name="customAttributes"
+                  label="Custom Attributes"
                 />
               </>
             </Form>

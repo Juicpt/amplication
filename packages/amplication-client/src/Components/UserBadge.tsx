@@ -1,20 +1,21 @@
 import React, { useEffect } from "react";
-import { gql, useQuery } from "@apollo/client";
+import { useQuery } from "@apollo/client";
 
 import * as models from "../models";
 
 import useAuthenticated from "../authentication/use-authenticated";
-import { UserAvatar, Tooltip } from "@amplication/design-system";
+import { UserAvatar, Tooltip } from "@amplication/ui/design-system";
 
 import "./UserBadge.scss";
 import { identity } from "../util/analytics";
+import { GET_USER } from "../Profile/accountQueries";
 
 type TData = {
   me: {
     account: models.Account;
   };
 };
-const TOOLTIP_DIRECTION = "e";
+const TOOLTIP_DIRECTION = "sw";
 
 function UserBadge() {
   const authenticated = useAuthenticated();
@@ -47,17 +48,3 @@ function UserBadge() {
 }
 
 export default UserBadge;
-
-export const GET_USER = gql`
-  query getUser {
-    me {
-      account {
-        id
-        email
-        firstName
-        lastName
-        createdAt
-      }
-    }
-  }
-`;
